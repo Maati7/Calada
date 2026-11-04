@@ -1,0 +1,773 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Trigo por proteína</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
+<style>
+:root{
+  --bg:#E9ECE8; --surface:#F7F8F5; --ink:#1B2622; --muted:#5C6964; --line:#C9D0CB;
+  --g1:#C79A1E; --g2:#A2561B; --g3:#2E6150; --sincp:#8A9590;
+  --accent:#2E6150; --accent-ink:#F7F8F5; --warn:#9B3B1F; --warn-bg:#F6E3DA; --ok-bg:#DDEBE3;
+  color-scheme: light;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px);
+  padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#141A18; --surface:#1C2421; --ink:#E6EBE7; --muted:#9AA6A1; --line:#33403B;
+    --g1:#DDB23A; --g2:#D07A3A; --g3:#5FA88D; --sincp:#77837E;
+    --accent:#5FA88D; --accent-ink:#0F1513; --warn:#F09A78; --warn-bg:#3A231B; --ok-bg:#1F3329;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#141A18; --surface:#1C2421; --ink:#E6EBE7; --muted:#9AA6A1; --line:#33403B;
+  --g1:#DDB23A; --g2:#D07A3A; --g3:#5FA88D; --sincp:#77837E;
+  --accent:#5FA88D; --accent-ink:#0F1513; --warn:#F09A78; --warn-bg:#3A231B; --ok-bg:#1F3329;
+  color-scheme: dark;
+}
+*,*::before,*::after{box-sizing:inherit}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--ink);
+  font-family:"Archivo",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;font-size:16px;line-height:1.45;
+  font-variant-numeric:tabular-nums}
+.wrap{max-width:1080px;margin:0 auto;padding:28px 20px 60px}
+header.top{display:flex;flex-wrap:wrap;gap:16px 28px;align-items:end;justify-content:space-between;margin-bottom:22px}
+h1{font-stretch:75%;font-weight:800;font-size:clamp(2rem,5vw,3.1rem);line-height:1;margin:0;letter-spacing:-.01em}
+.sub{color:var(--muted);margin:.4rem 0 0}
+.actions{display:flex;gap:10px;flex-wrap:wrap}
+button,.btn{font:inherit;font-weight:600;border-radius:6px;border:1px solid var(--line);background:var(--surface);color:var(--ink);
+  padding:.55rem .95rem;cursor:pointer}
+button:hover{border-color:var(--muted)}
+button.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+button:disabled{opacity:.45;cursor:not-allowed}
+button:focus-visible,input:focus-visible,select:focus-visible,.drop:focus-visible{outline:3px solid var(--g1);outline-offset:2px}
+button.link{border:0;background:none;padding:.2rem .3rem;color:var(--muted);text-decoration:underline;font-weight:500}
+
+/* Silo strip: the memorable element */
+.silo{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:20px 22px 18px;margin-bottom:22px}
+.silo-head{display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:6px 20px}
+.silo-total{font-stretch:75%;font-weight:800;font-size:clamp(2.2rem,6vw,3.6rem);line-height:1}
+.silo-total small{font-size:.38em;font-weight:600;color:var(--muted);margin-left:.3em;font-stretch:100%}
+.bar{display:flex;height:44px;border-radius:6px;overflow:hidden;margin:16px 0 10px;background:var(--line)}
+.bar span{display:block;height:100%;transition:width .5s ease}
+.legend{display:flex;flex-wrap:wrap;gap:6px 22px;font-size:.92rem;color:var(--muted)}
+.legend b{color:var(--ink);font-weight:700}
+.dot{display:inline-block;width:.7em;height:.7em;border-radius:2px;margin-right:.4em;vertical-align:-.02em}
+
+.drop{display:block;border:2px dashed var(--line);border-radius:10px;padding:22px;text-align:center;background:var(--surface);cursor:pointer;margin-bottom:22px;transition:border-color .15s,background .15s}
+.drop.over{border-color:var(--accent);background:var(--ok-bg)}
+.drop strong{font-size:1.1rem}
+.drop p{margin:.25rem 0 0;color:var(--muted);font-size:.92rem}
+
+.preview{border:2px solid var(--accent);border-radius:10px;background:var(--surface);padding:18px 20px;margin-bottom:22px}
+.preview h2{margin:0 0 .3rem;font-size:1.2rem}
+.notes{margin:.6rem 0 1rem;padding:0;list-style:none;font-size:.95rem}
+.notes li{padding:.35rem .6rem;border-radius:5px;margin-bottom:.35rem}
+.notes .w{background:var(--warn-bg);color:var(--warn)}
+.notes .o{background:var(--ok-bg)}
+
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:22px}
+.grid>*{min-width:0}
+@media (max-width:1000px){.grid{grid-template-columns:1fr}}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:18px 20px}
+.card-head{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px}
+.card h2{margin:0;font-size:1.2rem}
+.card .meta{color:var(--muted);font-size:.88rem}
+.scroll{overflow-x:auto}
+table{border-collapse:collapse;width:100%;min-width:420px;font-size:.95rem}
+th,td{padding:.5rem .45rem;text-align:right;border-bottom:1px solid var(--line);white-space:nowrap}
+th{font-weight:600;color:var(--muted);font-size:.82rem}
+th:first-child,td:first-child{text-align:left}
+td.g{font-weight:700}
+td.rng{color:var(--muted);font-size:.86rem}
+tr.tot td{border-bottom:0;border-top:2px solid var(--ink);font-weight:700}
+tr.sin td{color:var(--muted);font-style:italic}
+select,input{font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:.35rem .5rem}
+input[type=number]{width:100%;text-align:right}
+
+details.trucks{margin-top:12px}
+details.trucks summary{cursor:pointer;color:var(--muted);font-size:.92rem}
+details.trucks table{font-size:.86rem;margin-top:8px}
+
+.hist{margin-top:22px}
+.hist table{min-width:560px}
+.empty{color:var(--muted);padding:1rem 0}
+.status{font-size:.9rem;color:var(--muted);margin:0 0 14px}
+.status.w{color:var(--warn)}
+.base-form{display:grid;grid-template-columns:auto 1fr 1fr;gap:8px 12px;align-items:center;margin-top:10px}
+.base-form .h{font-size:.82rem;color:var(--muted);font-weight:600}
+.toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:.6rem 1rem;border-radius:6px;font-weight:600;opacity:0;pointer-events:none;transition:opacity .2s}
+.toast.on{opacity:1}
+@media (prefers-reduced-motion:reduce){.bar span,.drop,.toast{transition:none}}
+.hidden{display:none!important}
+.callout{border-left:4px solid var(--g1);background:var(--surface);border-radius:6px;padding:12px 16px;margin:0 0 22px;display:flex;gap:12px 18px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+.callout p{margin:0}
+.conn-form{display:grid;grid-template-columns:auto 1fr;gap:8px 12px;align-items:center}
+.conn-form input,.conn-row input{width:100%;min-width:0}
+.conn-row{display:flex;gap:8px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div>
+      <h1>Trigo por proteína</h1>
+      <p class="sub">Camiones descargados clasificados por CP (base 13,5 % de humedad)</p>
+    </div>
+    <div class="actions">
+      <button id="btnActualizar">Actualizar</button>
+      <button id="btnExport" class="hidden">Descargar Excel</button>
+      <button id="btnConn">Conexión</button>
+      <button id="btnBase">Editar punto de partida</button>
+    </div>
+  </header>
+
+  <p id="status" class="status">Conectando…</p>
+  <section class="card hidden" id="conexion" style="margin-bottom:22px"></section>
+
+  <section class="silo" aria-label="Acumulado total">
+    <div class="silo-head">
+      <div class="silo-total" id="siloTotal">–<small>kg acumulados</small></div>
+      <div class="meta" id="siloMeta"></div>
+    </div>
+    <div class="bar" id="bar" role="img" aria-label="Distribución del acumulado por grupo"></div>
+    <div class="legend" id="legend"></div>
+  </section>
+
+  <label class="drop" id="drop" tabindex="0">
+    <input type="file" id="file" accept=".xls,.xlsx,.csv" hidden>
+    <strong>Soltá acá el listado del día</strong>
+    <p>O hacé clic para elegirlo. Sirve el .XLS que sale del sistema (CF) tal cual.</p>
+  </label>
+
+  <section class="preview hidden" id="preview"></section>
+
+  <section class="card hidden" id="baseCard" style="margin-bottom:22px"></section>
+
+  <div class="grid">
+    <section class="card">
+      <div class="card-head">
+        <h2>Acumulado</h2>
+        <span class="meta" id="acuMeta"></span>
+      </div>
+      <div class="scroll"><table id="tAcu"></table></div>
+    </section>
+    <section class="card">
+      <div class="card-head">
+        <h2>Del día</h2>
+        <select id="selDia" aria-label="Elegir día"></select>
+      </div>
+      <div class="scroll"><table id="tDia"></table></div>
+      <details class="trucks" id="diaTrucks"></details>
+    </section>
+  </div>
+
+  <section class="card hist">
+    <div class="card-head"><h2>Listados cargados</h2></div>
+    <div class="scroll" id="hist"></div>
+  </section>
+</div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+(function(){
+"use strict";
+const GRUPOS=[
+  {id:"g1",nombre:"Grupo 1",cp:"hasta 9,99",bs:"hasta 11,40"},
+  {id:"g2",nombre:"Grupo 2",cp:"de 10 a 10,49",bs:"de 11,5 a 12,10"},
+  {id:"g3",nombre:"Grupo 3",cp:"más de 10,5",bs:"más de 12,15"}
+];
+const CAMPOS={ksnetos:"Neto con mermas (ksnetos)",netopto:"Neto en planta (netopto)"};
+const LS_CONN="trigoProteina.conexion";
+const $=id=>document.getElementById(id);
+const fmtKg=n=>((n||0)/1000).toLocaleString("es-AR",{minimumFractionDigits:3,maximumFractionDigits:3});
+const fmtCp=n=>(n==null||!isFinite(n))?"–":n.toLocaleString("es-AR",{minimumFractionDigits:2,maximumFractionDigits:2});
+const fmtPct=n=>(isFinite(n)?n:0).toLocaleString("es-AR",{maximumFractionDigits:1})+" %";
+const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+
+function grupoDe(cp){ if(!(cp>0)) return null; if(cp<10) return "g1"; if(cp<10.5) return "g2"; return "g3"; }
+const nombreGrupo=cp=>{const g=grupoDe(cp);return g?GRUPOS.find(x=>x.id===g).nombre:"Sin CP";};
+function num(v){ if(typeof v==="number") return v; if(v==null||v==="") return 0;
+  let s=String(v).trim(); if(s.includes(",")) s=s.replace(/\./g,"").replace(",","."); const n=parseFloat(s); return isFinite(n)?n:0; }
+const MESES={jan:1,ene:1,feb:2,mar:3,apr:4,abr:4,may:5,jun:6,jul:7,aug:8,ago:8,sep:9,set:9,oct:10,nov:11,dec:12,dic:12};
+function fechaISO(v){
+  if(v instanceof Date && !isNaN(v)) return v.getFullYear()+"-"+String(v.getMonth()+1).padStart(2,"0")+"-"+String(v.getDate()).padStart(2,"0");
+  const s=String(v||"").trim(); let m;
+  if((m=s.match(/^(\d{1,2})[-\/ ]([A-Za-z]{3})[a-z]*[-\/ ](\d{2,4})$/))){
+    const mm=MESES[m[2].toLowerCase()]; let y=+m[3]; if(y<100) y+=2000;
+    if(mm) return y+"-"+String(mm).padStart(2,"0")+"-"+m[1].padStart(2,"0");
+  }
+  if((m=s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/))){ let y=+m[3]; if(y<100) y+=2000; return y+"-"+m[2].padStart(2,"0")+"-"+m[1].padStart(2,"0"); }
+  if((m=s.match(/^(\d{4})-(\d{2})-(\d{2})/))) return m[0];
+  return "";
+}
+const fechaCorta=iso=>{ if(!iso) return "sin fecha"; const [y,m,d]=iso.split("-"); return d+"/"+m+"/"+y.slice(2); };
+const fechaUTC=iso=>{ const [y,m,d]=iso.split("-").map(Number); return new Date(Date.UTC(y,m-1,d)); };
+
+/* ---------- state ---------- */
+let conn=null, canWrite=false;
+let base=null, cargas=[], pendiente=null, diaSel="";
+let ultimaLectura=null, leyendo=false;
+
+const campo=()=>(base&&base.campo)||"ksnetos";
+const kgDe=c=>campo()==="netopto"?(c.kgp||0):(c.kg||0);
+
+function totales(camiones){
+  const t={g1:{kg:0,kgcp:0,n:0},g2:{kg:0,kgcp:0,n:0},g3:{kg:0,kgcp:0,n:0},sin:{kg:0,n:0}};
+  for(const c of camiones){ const g=grupoDe(c.cp), k=kgDe(c);
+    if(g){ t[g].kg+=k; t[g].kgcp+=k*c.cp; t[g].n++; } else { t.sin.kg+=k; t.sin.n++; } }
+  return t;
+}
+function acumulado(){
+  const a={g1:{kg:0,kgcp:0,n:0},g2:{kg:0,kgcp:0,n:0},g3:{kg:0,kgcp:0,n:0},sin:{kg:0,n:0}};
+  if(base) for(const g of GRUPOS){ const b=base[g.id]||{}; a[g.id].kg+=num(b.kg); a[g.id].kgcp+=num(b.kg)*num(b.prom); }
+  for(const c of cargas){ const t=totales(c.camiones||[]);
+    for(const g of GRUPOS){ a[g.id].kg+=t[g.id].kg; a[g.id].kgcp+=t[g.id].kgcp; a[g.id].n+=t[g.id].n; }
+    a.sin.kg+=t.sin.kg; a.sin.n+=t.sin.n; }
+  return a;
+}
+
+/* ---------- conexión con la planilla ---------- */
+function leerConexion(){ try{ const s=localStorage.getItem(LS_CONN); return s?JSON.parse(s):null; }catch{ return null; } }
+function guardarConexion(c){ try{ if(c) localStorage.setItem(LS_CONN,JSON.stringify(c)); else localStorage.removeItem(LS_CONN); }catch{} }
+
+class ErrorPlanilla extends Error{}
+async function api(accion,datos){
+  if(!conn) throw new ErrorPlanilla("No hay conexión configurada.");
+  let r;
+  try{ r=await fetch(conn.url,{method:"POST",body:JSON.stringify({clave:conn.clave,accion,...(datos||{})})}); }
+  catch{ throw new ErrorPlanilla("No hay conexión con la planilla. Revisá internet y probá de nuevo."); }
+  let j;
+  try{ j=await r.json(); }
+  catch{ throw new ErrorPlanilla("La planilla no respondió bien. Revisá que la implementación tenga acceso para \u201cCualquier persona\u201d."); }
+  if(!j.ok){
+    const m={clave:"La clave no coincide con la del script de la planilla.",ocupado:"La planilla está ocupada con otra carga. Probá de nuevo en unos segundos.",
+      interno:"La planilla dio un error"+(j.detalle?": "+j.detalle:".")}[j.error]||"La planilla rechazó el pedido.";
+    throw new ErrorPlanilla(m);
+  }
+  base=j.base; cargas=j.cargas||[]; ultimaLectura=new Date();
+  return j;
+}
+
+async function actualizar(silencioso){
+  if(!conn||leyendo) return;
+  leyendo=true;
+  if(!silencioso) setStatus("Leyendo la planilla…");
+  try{ await api("estado"); canWrite=true; estadoConectado(); }
+  catch(e){ setStatus(e.message,true); }
+  finally{ leyendo=false; render(); }
+}
+function estadoConectado(){
+  const h=ultimaLectura?ultimaLectura.toLocaleTimeString("es-AR",{hour:"2-digit",minute:"2-digit",hour12:false}):"";
+  setStatus(`Conectado a la planilla. Actualizado a las ${h}.`);
+}
+
+/* ---------- rendering ---------- */
+function tabla(t, conCamiones){
+  const totKg=GRUPOS.reduce((s,g)=>s+t[g.id].kg,0)+t.sin.kg;
+  const totClas=GRUPOS.reduce((s,g)=>s+t[g.id].kg,0);
+  const totCp=GRUPOS.reduce((s,g)=>s+t[g.id].kgcp,0);
+  let h="<thead><tr><th>Grupo</th><th>Prot. 13,5</th><th>Base seca</th>"+(conCamiones?"<th>Cam.</th>":"")+"<th>Toneladas</th><th>%</th><th>Promedio</th></tr></thead><tbody>";
+  for(const g of GRUPOS){ const r=t[g.id];
+    h+=`<tr><td class="g"><span class="dot" style="background:var(--${g.id})"></span>${g.nombre}</td><td class="rng">${g.cp}</td><td class="rng">${g.bs}</td>${conCamiones?`<td>${r.n}</td>`:""}<td>${fmtKg(r.kg)}</td><td>${fmtPct(totKg?r.kg/totKg*100:0)}</td><td>${r.kg?fmtCp(r.kgcp/r.kg):"–"}</td></tr>`; }
+  if(t.sin.n||t.sin.kg) h+=`<tr class="sin"><td><span class="dot" style="background:var(--sincp)"></span>Sin CP</td><td class="rng" colspan="2">sin análisis cargado</td>${conCamiones?`<td>${t.sin.n}</td>`:""}<td>${fmtKg(t.sin.kg)}</td><td>${fmtPct(totKg?t.sin.kg/totKg*100:0)}</td><td>–</td></tr>`;
+  const nTot=GRUPOS.reduce((s,g)=>s+t[g.id].n,0)+t.sin.n;
+  h+=`<tr class="tot"><td>Total</td><td></td><td></td>${conCamiones?`<td>${nTot}</td>`:""}<td>${fmtKg(totKg)}</td><td>100 %</td><td>${totClas?fmtCp(totCp/totClas):"–"}</td></tr></tbody>`;
+  return h;
+}
+
+function puedeExportar(){ return !!base; }
+
+function render(){
+  const a=acumulado();
+  const totKg=GRUPOS.reduce((s,g)=>s+a[g.id].kg,0)+a.sin.kg;
+  $("siloTotal").innerHTML=fmtKg(totKg)+"<small>toneladas acumuladas</small>";
+  const ult=cargas.length?cargas.map(c=>c.fecha).filter(Boolean).sort().pop():"";
+  $("siloMeta").textContent=cargas.length?`Último día cargado: ${fechaCorta(ult)}`:"Todavía no se cargó ningún listado";
+  const parts=[...GRUPOS.map(g=>({c:`var(--${g.id})`,kg:a[g.id].kg,n:g.nombre})), {c:"var(--sincp)",kg:a.sin.kg,n:"Sin CP"}];
+  $("bar").innerHTML=parts.map(p=>`<span style="width:${totKg?p.kg/totKg*100:0}%;background:${p.c}" title="${p.n}: ${fmtKg(p.kg)} t"></span>`).join("");
+  $("legend").innerHTML=parts.filter(p=>p.kg>0||p.n!=="Sin CP").map(p=>`<span><span class="dot" style="background:${p.c}"></span>${p.n} <b>${fmtPct(totKg?p.kg/totKg*100:0)}</b></span>`).join("");
+
+  $("tAcu").innerHTML=tabla(a,false);
+  $("acuMeta").textContent=`Peso: ${campo()==="netopto"?"neto en planta":"neto con mermas"}`;
+
+  const dias=[...new Set(cargas.map(c=>c.fecha||""))].sort().reverse();
+  if(!dias.includes(diaSel)) diaSel=dias[0]||"";
+  $("selDia").innerHTML=dias.length?dias.map(d=>`<option value="${esc(d)}"${d===diaSel?" selected":""}>${fechaCorta(d)}</option>`).join(""):"<option>Sin datos</option>";
+  $("selDia").disabled=!dias.length;
+  const camDia=cargas.filter(c=>(c.fecha||"")===diaSel).flatMap(c=>c.camiones||[]);
+  if(camDia.length){
+    $("tDia").innerHTML=tabla(totales(camDia),true);
+    $("diaTrucks").innerHTML=`<summary>Ver los ${camDia.length} camiones</summary>`+tablaCamiones(camDia);
+    $("diaTrucks").classList.remove("hidden");
+  } else {
+    $("tDia").innerHTML=`<tbody><tr><td class="empty">Cuando cargues el primer listado, acá ves el cuadro del día.</td></tr></tbody>`;
+    $("diaTrucks").classList.add("hidden");
+  }
+  renderHist();
+  $("btnExport").classList.toggle("hidden",!(puedeExportar()&&(cargas.length||base)));
+  $("btnBase").disabled=!canWrite;
+  if(!$("baseCard").classList.contains("hidden")) renderBaseForm();
+}
+
+function tablaCamiones(cams){
+  const rows=[...cams].sort((x,y)=>(x.cp||0)-(y.cp||0));
+  return `<div class="scroll"><table><thead><tr><th>Patente</th><th>Procedencia</th><th>CP</th><th>Grupo</th><th>Toneladas</th></tr></thead><tbody>`+
+    rows.map(c=>`<tr><td>${esc(c.p)}</td><td>${esc(c.proc)}</td><td>${c.cp>0?fmtCp(c.cp):"–"}</td><td>${nombreGrupo(c.cp)}</td><td>${fmtKg(kgDe(c))}</td></tr>`).join("")+
+    `</tbody></table></div>`;
+}
+
+function renderHist(){
+  if(!cargas.length){ $("hist").innerHTML=`<p class="empty">No hay listados cargados.</p>`; return; }
+  const rows=[...cargas].sort((x,y)=>(y.cargadoEn||"").localeCompare(x.cargadoEn||""));
+  $("hist").innerHTML=`<table><thead><tr><th>Día</th><th>Archivo</th><th>Camiones</th><th>Toneladas</th><th>Cargado</th><th></th></tr></thead><tbody>`+
+    rows.map(c=>{const t=totales(c.camiones||[]);const kg=GRUPOS.reduce((s,g)=>s+t[g.id].kg,0)+t.sin.kg;
+      const when=c.cargadoEn?new Date(c.cargadoEn).toLocaleString("es-AR",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"}):"";
+      return `<tr><td>${fechaCorta(c.fecha)}</td><td>${esc(c.archivo)}</td><td>${(c.camiones||[]).length}</td><td>${fmtKg(kg)}</td><td>${when}</td><td>${canWrite?`<button class="link" data-del="${esc(c.id)}">Quitar</button>`:""}</td></tr>`;}).join("")+
+    `</tbody></table>`;
+}
+
+/* ---------- file reading ---------- */
+function leerArchivo(file){
+  const fr=new FileReader();
+  fr.onload=e=>{
+    try{
+      const wb=XLSX.read(new Uint8Array(e.target.result),{type:"array",cellDates:true});
+      if(wb.SheetNames.includes("_registro")) return prepararRegistro(file.name,wb);
+      let rows=null;
+      for(const n of wb.SheetNames){
+        const r=XLSX.utils.sheet_to_json(wb.Sheets[n],{defval:""});
+        if(r.length){ const keys=Object.keys(r[0]).map(k=>k.toLowerCase().trim());
+          if(keys.includes("cp")&&(keys.includes("ksnetos")||keys.includes("netopto"))&&keys.includes("codbarra")){ rows=r; break; } }
+      }
+      if(!rows) throw new Error("No reconozco este archivo. Tiene que ser el listado del sistema (CF), con las columnas cp, ksnetos y codbarra, o un Excel de registro descargado de esta app.");
+      const camiones=rows.map(r=>{const o={};for(const k in r)o[k.toLowerCase().trim()]=r[k];return o;})
+        .filter(o=>o.patente||o.codbarra)
+        .map(o=>({c:String(o.codbarra||"").trim(),p:String(o.patente||"").trim(),f:fechaISO(o.fechatara),
+          cp:num(o.cp),kg:num(o.ksnetos),kgp:num(o.netopto),proc:String(o.nomproce||"").trim(),prod:String(o.nompro||"").trim()}));
+      if(!camiones.length) throw new Error("El archivo no tiene camiones.");
+      prepararPendiente(file.name,camiones);
+    }catch(err){ mostrarError(err.message||String(err)); }
+  };
+  fr.onerror=()=>mostrarError("No se pudo leer el archivo.");
+  fr.readAsArrayBuffer(file);
+}
+
+function prepararRegistro(nombre,wb){
+  const rows=XLSX.utils.sheet_to_json(wb.Sheets["_registro"],{header:1,defval:""});
+  let data;
+  try{ data=JSON.parse(rows.map(r=>String(r[0]||"")).join("")); }catch{ throw new Error("El Excel de registro está dañado: no se pudo leer la hoja interna."); }
+  if(!data||!data.base||!Array.isArray(data.cargas)) throw new Error("El Excel de registro no tiene los datos esperados.");
+  pendiente={tipo:"registro",archivo:nombre,data};
+  renderPreview();
+}
+
+function indiceCodigos(){
+  const m=new Map();
+  for(const c of cargas)(c.camiones||[]).forEach((t,i)=>{ if(t.c) m.set(t.c,{carga:c.id,i,cp:t.cp}); });
+  return m;
+}
+
+function prepararPendiente(archivo,camiones){
+  const idx=indiceCodigos();
+  const nuevos=[], repetidos=[], completar=[];
+  for(const t of camiones){
+    const prev=t.c?idx.get(t.c):null;
+    if(!prev) nuevos.push(t);
+    else if(!(prev.cp>0)&&t.cp>0) completar.push({...t,ref:prev});
+    else repetidos.push(t);
+  }
+  const fechas=[...new Set(nuevos.map(t=>t.f).filter(Boolean))].sort();
+  const productos=[...new Set(camiones.map(t=>t.prod).filter(Boolean))];
+  pendiente={tipo:"listado",archivo,nuevos,repetidos,completar,fechas,productos};
+  renderPreview();
+}
+
+function renderPreview(){
+  const p=pendiente, el=$("preview");
+  if(!p){ el.classList.add("hidden"); el.innerHTML=""; return; }
+  if(p.tipo==="registro") return renderPreviewRegistro();
+  const t=totales(p.nuevos), kg=GRUPOS.reduce((s,g)=>s+t[g.id].kg,0)+t.sin.kg;
+  const notas=[];
+  if(p.nuevos.length) notas.push(`<li class="o">${p.nuevos.length} camiones nuevos, ${fmtKg(kg)} t${p.fechas.length?` del ${p.fechas.map(fechaCorta).join(", ")}`:""}.</li>`);
+  if(p.repetidos.length) notas.push(`<li class="w">${p.repetidos.length} camiones ya estaban cargados (mismo código de barra) y no se van a sumar de nuevo.</li>`);
+  if(p.completar.length) notas.push(`<li class="o">${p.completar.length} camiones que estaban sin CP ahora traen análisis: se les completa la proteína y pasan a su grupo.</li>`);
+  if(t.sin.n) notas.push(`<li class="w">${t.sin.n} camiones sin CP (${fmtKg(t.sin.kg)} t). Se suman como "Sin CP" y se clasifican cuando cargues un listado que traiga el análisis.</li>`);
+  if(p.productos.some(x=>!/trigo/i.test(x))) notas.push(`<li class="w">El listado trae otros productos además de trigo: ${esc(p.productos.join(", "))}.</li>`);
+  if(p.fechas.length>1) notas.push(`<li class="w">El listado tiene camiones de ${p.fechas.length} días distintos. Cada uno se va a ver en su día.</li>`);
+  const hay=p.nuevos.length||p.completar.length;
+  el.innerHTML=`<h2>${esc(p.archivo)}</h2><ul class="notes">${notas.join("")||`<li class="w">Todos los camiones de este listado ya estaban cargados.</li>`}</ul>`+
+    (p.nuevos.length?`<div class="scroll"><table>${tabla(t,true)}</table></div>`:"")+
+    `<div class="actions" style="margin-top:14px">`+
+    (hay?`<button class="primary" id="btnConfirm"${canWrite?"":" disabled"}>Sumar al acumulado</button>`:"")+
+    `<button id="btnCancel">${hay?"Cancelar":"Cerrar"}</button></div>`;
+  el.classList.remove("hidden");
+  $("btnCancel").onclick=()=>{pendiente=null;renderPreview();};
+  if(hay) $("btnConfirm").onclick=confirmar;
+  el.scrollIntoView({behavior:matchMedia("(prefers-reduced-motion: reduce)").matches?"auto":"smooth",block:"nearest"});
+}
+
+function renderPreviewRegistro(){
+  const p=pendiente, d=p.data, el=$("preview");
+  const nCam=d.cargas.reduce((s,c)=>s+(c.camiones||[]).length,0);
+  const dias=[...new Set(d.cargas.map(c=>c.fecha).filter(Boolean))].sort();
+  const emitido=d.emitido?new Date(d.emitido).toLocaleString("es-AR",{day:"2-digit",month:"2-digit",year:"2-digit",hour:"2-digit",minute:"2-digit"}):"fecha desconocida";
+  const hayAca=cargas.length>0;
+  el.innerHTML=`<h2>${esc(p.archivo)}</h2><ul class="notes">
+    <li class="o">Registro emitido el ${emitido}: ${d.cargas.length} listados, ${nCam} camiones${dias.length?`, del ${fechaCorta(dias[0])} al ${fechaCorta(dias[dias.length-1])}`:""}.</li>
+    ${hayAca?`<li class="w">Abrir este registro reemplaza todo lo que hay cargado ahora (${cargas.length} listados). Usalo para seguir desde donde quedó otra computadora.</li>`:""}
+  </ul><div class="actions"><button class="primary" id="btnConfirm"${canWrite?"":" disabled"}>Abrir registro</button><button id="btnCancel">Cancelar</button></div>`;
+  el.classList.remove("hidden");
+  $("btnCancel").onclick=()=>{pendiente=null;renderPreview();};
+  $("btnConfirm").onclick=abrirRegistro;
+}
+
+function mostrarError(msg){
+  pendiente=null;
+  $("preview").innerHTML=`<ul class="notes"><li class="w">${esc(msg)}</li></ul><div class="actions"><button id="btnCancel">Cerrar</button></div>`;
+  $("preview").classList.remove("hidden");
+  $("btnCancel").onclick=()=>{$("preview").classList.add("hidden");};
+}
+
+const nuevoId=f=>(f||"sf")+"_"+Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+
+async function confirmar(){
+  const p=pendiente; if(!p) return;
+  const btn=$("btnConfirm"); btn.disabled=true; btn.textContent="Guardando…";
+  try{
+    const porDia={};
+    for(const t of p.nuevos){ (porDia[t.f||""] ||= []).push({c:t.c,p:t.p,cp:t.cp,kg:t.kg,kgp:t.kgp,proc:t.proc}); }
+    const ahora=new Date().toISOString();
+    const nuevas=Object.entries(porDia).map(([f,cams])=>({id:nuevoId(f),archivo:p.archivo,fecha:f,cargadoEn:ahora,camiones:cams}));
+    const upd={};
+    for(const t of p.completar){ (upd[t.ref.carga] ||= []).push(t); }
+    await api("agregar",{cargas:nuevas,completar:p.completar.map(t=>({c:t.c,cp:t.cp}))});
+    estadoConectado();
+    if(nuevas.length) diaSel=nuevas.map(c=>c.fecha).sort().pop();
+    pendiente=null; renderPreview(); render();
+    toast("Listado sumado al acumulado");
+  }catch(err){
+    btn.disabled=false; btn.textContent="Sumar al acumulado";
+    toast(err instanceof ErrorPlanilla?err.message:"No se pudo guardar. Probá de nuevo.");
+  }
+}
+
+async function abrirRegistro(){
+  const d=pendiente&&pendiente.data; if(!d) return;
+  const btn=$("btnConfirm"); btn.disabled=true; btn.textContent="Abriendo…";
+  try{
+    const nb={campo:d.base.campo||"ksnetos"}; for(const g of GRUPOS) nb[g.id]={kg:num(d.base[g.id]&&d.base[g.id].kg),prom:num(d.base[g.id]&&d.base[g.id].prom)};
+    const nc=d.cargas.map(c=>({id:c.id||nuevoId(c.fecha),archivo:c.archivo||"",fecha:c.fecha||"",cargadoEn:c.cargadoEn||"",camiones:(c.camiones||[]).map(t=>({c:String(t.c||""),p:String(t.p||""),cp:num(t.cp),kg:num(t.kg),kgp:num(t.kgp),proc:String(t.proc||"")}))}));
+    await api("reemplazar",{base:nb,cargas:nc});
+    estadoConectado();
+    diaSel="";
+    pendiente=null; renderPreview(); render();
+    toast("Registro abierto");
+  }catch(err){
+    btn.disabled=false; btn.textContent="Abrir registro";
+    toast(err instanceof ErrorPlanilla?err.message:"No se pudo abrir el registro. Probá de nuevo.");
+  }
+}
+
+async function quitar(id){
+  const c=cargas.find(x=>x.id===id); if(!c) return;
+  if(!confirm(`¿Quitar el listado ${c.archivo} del ${fechaCorta(c.fecha)}? Sus kilos se restan del acumulado.`)) return;
+  try{
+    await api("quitar",{id}); estadoConectado(); render(); toast("Listado quitado");
+  }catch(err){ toast(err instanceof ErrorPlanilla?err.message:"No se pudo quitar. Probá de nuevo."); }
+}
+
+/* ---------- base form ---------- */
+function renderBaseForm(){
+  const b=base||{g1:{},g2:{},g3:{}};
+  $("baseCard").innerHTML=`<div class="card-head"><h2>Punto de partida del acumulado</h2></div>
+  <p class="meta" style="margin:0">Toneladas y promedio de CP que había antes del primer listado cargado acá. Los listados se suman encima.</p>
+  <div class="base-form"><span></span><span class="h">Toneladas</span><span class="h">Promedio CP</span>
+  ${GRUPOS.map(g=>`<label for="bk_${g.id}"><span class="dot" style="background:var(--${g.id})"></span>${g.nombre}</label>
+    <input type="number" id="bk_${g.id}" min="0" step="0.001" value="${num(b[g.id]&&b[g.id].kg)?(num(b[g.id].kg)/1000):""}">
+    <input type="number" id="bp_${g.id}" min="0" step="0.01" value="${num(b[g.id]&&b[g.id].prom)||""}" aria-label="Promedio ${g.nombre}">`).join("")}
+  <label for="bcampo">Peso a contar</label>
+  <select id="bcampo" style="grid-column:span 2">${Object.entries(CAMPOS).map(([k,v])=>`<option value="${k}"${campo()===k?" selected":""}>${v}</option>`).join("")}</select></div>
+  <div class="actions" style="margin-top:14px"><button class="primary" id="btnSaveBase">Guardar punto de partida</button><button id="btnCloseBase">Cancelar</button></div>`;
+  $("btnCloseBase").onclick=()=>$("baseCard").classList.add("hidden");
+  $("btnSaveBase").onclick=guardarBase;
+}
+async function guardarBase(){
+  const nb={campo:$("bcampo").value};
+  for(const g of GRUPOS) nb[g.id]={kg:Math.round(parseFloat($("bk_"+g.id).value||"0")*1000),prom:num($("bp_"+g.id).value)};
+  try{
+    await api("base",{base:nb}); estadoConectado(); render();
+    $("baseCard").classList.add("hidden"); toast("Punto de partida guardado"); }
+  catch(err){ toast(err instanceof ErrorPlanilla?err.message:"No se pudo guardar. Probá de nuevo."); }
+}
+
+/* ---------- Excel export (ExcelJS) ---------- */
+const XC={ink:"FF1B2622",verde:"FF2E6150",verdeT:"FFDDEBE3",linea:"FFC9D0CB",gris:"FF5C6964",zebra:"FFF4F6F3",azul:"FF0000FF",
+  g1:"FFC79A1E",g2:"FFA2561B",g3:"FF2E6150",sin:"FF8A9590",g1t:"FFF7EDCC",g2t:"FFF3DFCF",g3t:"FFD7E7E0",sint:"FFE8EBE9"};
+const fill=c=>({type:"pattern",pattern:"solid",fgColor:{argb:c}});
+const thin=c=>({style:"thin",color:{argb:c}});
+
+async function construirExcel(){
+  const wb=new ExcelJS.Workbook();
+  wb.creator="Trigo por proteína"; wb.created=new Date();
+  const F={name:"Arial",size:10};
+  const ahora=new Date();
+  const emitidoTxt=ahora.toLocaleString("es-AR",{day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit"});
+  const cams=[];
+  for(const c of [...cargas].sort((x,y)=>(x.fecha||"").localeCompare(y.fecha||"")||(x.cargadoEn||"").localeCompare(y.cargadoEn||"")))
+    for(const t of c.camiones||[]) cams.push({...t,fecha:c.fecha});
+  const n=Math.max(2,cams.length+1);
+  const R=col=>`Camiones!$${col}$2:$${col}$${n}`;
+  const kgCampo=campo()==="netopto"?"netopto":"ksnetos";
+  const a=acumulado();
+  const dia=diaSel||"";
+  const tDia=totales(cargas.filter(c=>(c.fecha||"")===dia).flatMap(c=>c.camiones||[]));
+  const gKey=["g1","g2","g3"];
+
+  /* ===== Hoja Cuadros ===== */
+  const ws=wb.addWorksheet("Cuadros",{views:[{showGridLines:false}],properties:{tabColor:{argb:XC.verde}},
+    pageSetup:{orientation:"landscape",fitToPage:true,fitToWidth:1,fitToHeight:0,paperSize:9,margins:{left:.5,right:.5,top:.6,bottom:.6,header:.3,footer:.3}}});
+  ws.columns=[{width:2},{width:16},{width:17},{width:17},{width:12},{width:16},{width:10},{width:13}];
+  const setRow=(r,vals,style={})=>{ vals.forEach((v,i)=>{ if(v===undefined) return; const c=ws.getCell(r,i+2); c.value=v; c.font={...F,...(style.font||{})}; if(style.fill) c.fill=style.fill; if(style.alignment) c.alignment=style.alignment; }); };
+
+  ws.mergeCells("B2:H2");
+  const t1=ws.getCell("B2"); t1.value="Divisiones de trigo por proteínas"; t1.font={name:"Arial",size:18,bold:true,color:{argb:XC.ink}};
+  ws.getRow(2).height=28;
+  ws.mergeCells("B3:H3");
+  const t2=ws.getCell("B3"); t2.value=`Kilos: ${CAMPOS[kgCampo].toLowerCase()}. Emitido el ${emitidoTxt}`; t2.font={...F,color:{argb:XC.gris}};
+
+  const P=23; // partida rows 24..26
+  function titulo(r,txt){
+    ws.mergeCells(r,2,r,8);
+    const c=ws.getCell(r,2); c.value=txt; c.font={name:"Arial",size:13,bold:true,color:{argb:XC.verde}};
+    for(let k=2;k<=8;k++) ws.getCell(r,k).border={bottom:{style:"medium",color:{argb:XC.verde}}};
+    ws.getRow(r).height=22;
+  }
+  function encabezado(r,cols){
+    cols.forEach((v,i)=>{ const c=ws.getCell(r,i+2); c.value=v; c.font={...F,bold:true,color:{argb:"FFFFFFFF"}}; c.fill=fill(XC.verde);
+      c.alignment={horizontal:i<3?"left":"right",vertical:"middle"}; });
+    ws.getRow(r).height=20;
+  }
+  function filaGrupo(r,idx,cells){
+    const g=GRUPOS[idx]||null, col=g?XC[g.id]:XC.sin, tint=g?XC[g.id+"t"]:XC.sint;
+    for(let k=2;k<=8;k++){ const c=ws.getCell(r,k); c.font={...F}; c.border={bottom:thin(XC.linea)}; c.alignment={vertical:"middle",horizontal:k<=4?"left":"right"}; }
+    const b=ws.getCell(r,2); b.value=g?g.nombre:"Sin CP"; b.font={...F,bold:true,color:{argb:XC.ink}}; b.fill=fill(tint);
+    b.border={left:{style:"thick",color:{argb:col}},bottom:thin(XC.linea)};
+    ws.getCell(r,3).value=g?g.cp:"sin análisis"; ws.getCell(r,3).font={...F,color:{argb:XC.gris}};
+    ws.getCell(r,4).value=g?g.bs:""; ws.getCell(r,4).font={...F,color:{argb:XC.gris}};
+    if(!g){ for(let k=2;k<=8;k++) ws.getCell(r,k).font={...ws.getCell(r,k).font,italic:true}; }
+    for(const [k,v] of Object.entries(cells)){ const c=ws.getCell(r,+k); c.value=v; }
+    ws.getCell(r,6).numFmt="#,##0"; ws.getCell(r,7).numFmt="0.0%"; ws.getCell(r,8).numFmt="0.00"; ws.getCell(r,5).numFmt="0";
+    ws.getRow(r).height=19;
+  }
+  function filaTotal(r){
+    for(let k=2;k<=8;k++){ const c=ws.getCell(r,k); c.font={...F,bold:true,size:11}; c.border={top:{style:"medium",color:{argb:XC.ink}}}; c.alignment={horizontal:k<=4?"left":"right",vertical:"middle"}; }
+    ws.getCell(r,2).value="Total";
+    ws.getCell(r,6).numFmt="#,##0"; ws.getCell(r,7).numFmt="0.0%"; ws.getCell(r,8).numFmt="0.00"; ws.getCell(r,5).numFmt="0";
+    ws.getRow(r).height=21;
+  }
+  const res=(x,f)=>({formula:f,result:x});
+
+  // ---- Acumulado (rows 5..11)
+  titulo(5,"Acumulado");
+  encabezado(6,["Grupo","Prot. 13,5","Base seca","","kg","%","Promedio CP"]);
+  const totA=gKey.reduce((s,k)=>s+a[k].kg,0)+a.sin.kg, clasA=gKey.reduce((s,k)=>s+a[k].kg,0), cpA=gKey.reduce((s,k)=>s+a[k].kgcp,0);
+  GRUPOS.forEach((g,i)=>{ const r=7+i, pr=P+1+i, x=a[g.id];
+    filaGrupo(r,i,{
+      6:res(Math.round(x.kg),`F${pr}+SUMIFS(${R("I")},${R("F")},"${g.nombre}")`),
+      7:res(totA?x.kg/totA:0,`IF($F$11=0,0,F${r}/$F$11)`),
+      8:res(x.kg?+(x.kgcp/x.kg).toFixed(4):"",`IF(F${r}=0,"",(F${pr}*H${pr}+SUMPRODUCT((${R("F")}="${g.nombre}")*${R("I")}*${R("E")}))/F${r})`)});
+  });
+  filaGrupo(10,-1,{6:res(Math.round(a.sin.kg),`SUMIFS(${R("I")},${R("F")},"Sin CP")`),7:res(totA?a.sin.kg/totA:0,`IF($F$11=0,0,F10/$F$11)`),8:"–"});
+  filaTotal(11);
+  ws.getCell("F11").value=res(Math.round(totA),"SUM(F7:F10)");
+  ws.getCell("G11").value=res(totA?1:0,"IF(F11=0,0,SUM(G7:G10))");
+  ws.getCell("H11").value=res(clasA?+(cpA/clasA).toFixed(4):"",`IF(SUM(F7:F9)=0,"",SUMPRODUCT(F7:F9,H7:H9)/SUM(F7:F9))`);
+
+  // ---- Del día (rows 13..19)
+  ws.mergeCells("B13:F13"); ws.getRow(13).height=22;
+  ws.getCell("G13").value="Fecha"; ws.getCell("G13").font={...F,color:{argb:XC.gris}}; ws.getCell("G13").alignment={horizontal:"right",vertical:"middle"};
+  const fd=ws.getCell("H13"); fd.value=dia?fechaUTC(dia):""; fd.numFmt="dd/mm/yyyy"; fd.font={...F,bold:true,size:11}; fd.alignment={horizontal:"right",vertical:"middle"};
+  for(let k=2;k<=8;k++) ws.getCell(13,k).border={bottom:{style:"medium",color:{argb:XC.verde}}};
+  ws.getCell("B13").value="Del día"; ws.getCell("B13").font={name:"Arial",size:13,bold:true,color:{argb:XC.verde}};
+  encabezado(14,["Grupo","Prot. 13,5","Base seca","Camiones","kg","%","Promedio CP"]);
+  const totD=gKey.reduce((s,k)=>s+tDia[k].kg,0)+tDia.sin.kg, clasD=gKey.reduce((s,k)=>s+tDia[k].kg,0), cpD=gKey.reduce((s,k)=>s+tDia[k].kgcp,0);
+  GRUPOS.forEach((g,i)=>{ const r=15+i, x=tDia[g.id];
+    filaGrupo(r,i,{
+      5:res(x.n,`COUNTIFS(${R("F")},"${g.nombre}",${R("A")},$H$13)`),
+      6:res(Math.round(x.kg),`SUMIFS(${R("I")},${R("F")},"${g.nombre}",${R("A")},$H$13)`),
+      7:res(totD?x.kg/totD:0,`IF($F$19=0,0,F${r}/$F$19)`),
+      8:res(x.kg?+(x.kgcp/x.kg).toFixed(4):"",`IF(F${r}=0,"",SUMPRODUCT((${R("F")}="${g.nombre}")*(${R("A")}=$H$13)*${R("I")}*${R("E")})/F${r})`)});
+  });
+  filaGrupo(18,-1,{5:res(tDia.sin.n,`COUNTIFS(${R("F")},"Sin CP",${R("A")},$H$13)`),6:res(Math.round(tDia.sin.kg),`SUMIFS(${R("I")},${R("F")},"Sin CP",${R("A")},$H$13)`),7:res(totD?tDia.sin.kg/totD:0,`IF($F$19=0,0,F18/$F$19)`),8:"–"});
+  filaTotal(19);
+  ws.getCell("E19").value=res(gKey.reduce((s,k)=>s+tDia[k].n,0)+tDia.sin.n,"SUM(E15:E18)");
+  ws.getCell("F19").value=res(Math.round(totD),"SUM(F15:F18)");
+  ws.getCell("G19").value=res(totD?1:0,"IF(F19=0,0,SUM(G15:G18))");
+  ws.getCell("H19").value=res(clasD?+(cpD/clasD).toFixed(4):"",`IF(SUM(F15:F17)=0,"",SUMPRODUCT(F15:F17,H15:H17)/SUM(F15:F17))`);
+  ws.getCell("B20").value="Para ver otro día, cambiá la fecha de la celda H13.";
+  ws.getCell("B20").font={...F,size:9,italic:true,color:{argb:XC.gris}};
+
+  // ---- Punto de partida (rows 22..26)
+  ws.mergeCells("B22:H22");
+  ws.getCell("B22").value="Punto de partida (kilos y promedio antes del primer listado cargado en la app)";
+  ws.getCell("B22").font={...F,bold:true,color:{argb:XC.gris}};
+  ["Grupo","","","","kg","","Promedio CP"].forEach((v,i)=>{ const c=ws.getCell(P,i+2); c.value=v||null; c.font={...F,bold:true,color:{argb:XC.gris}}; c.border={bottom:thin(XC.linea)}; c.alignment={horizontal:i<3?"left":"right"}; });
+  GRUPOS.forEach((g,i)=>{ const r=P+1+i, b=base&&base[g.id]||{};
+    ws.getCell(r,2).value=g.nombre; ws.getCell(r,2).font={...F,color:{argb:XC.gris}};
+    const k=ws.getCell(r,6); k.value=num(b.kg); k.numFmt="#,##0"; k.font={...F,color:{argb:XC.azul}};
+    const pp=ws.getCell(r,8); pp.value=num(b.prom); pp.numFmt="0.00"; pp.font={...F,color:{argb:XC.azul}};
+    for(let c=2;c<=8;c++) ws.getCell(r,c).border={bottom:thin(XC.linea)};
+  });
+  ws.getCell("B28").value="Los números en azul son valores cargados a mano (Hoja1 original). El resto se calcula con fórmulas a partir de la hoja Camiones.";
+  ws.getCell("B28").font={...F,size:9,italic:true,color:{argb:XC.gris}};
+
+  /* ===== Hoja Por día ===== */
+  const wd=wb.addWorksheet("Por día",{views:[{state:"frozen",ySplit:1,showGridLines:false}],properties:{tabColor:{argb:XC.g1}},pageSetup:{orientation:"landscape",fitToPage:true,fitToWidth:1,fitToHeight:0,paperSize:9}});
+  const hdD=["Fecha","Camiones","Grupo 1 kg","Grupo 2 kg","Grupo 3 kg","Sin CP kg","Total kg","Promedio CP"];
+  wd.columns=[{width:12},{width:11},{width:14},{width:14},{width:14},{width:12},{width:15},{width:13}];
+  const hr=wd.getRow(1); hdD.forEach((v,i)=>{ const c=hr.getCell(i+1); c.value=v; c.font={...F,bold:true,color:{argb:"FFFFFFFF"}}; c.fill=fill(XC.verde); c.alignment={horizontal:i?"right":"left",vertical:"middle"}; });
+  [3,4,5].forEach((ci,i)=>{ hr.getCell(ci).border={bottom:{style:"thick",color:{argb:XC[gKey[i]]}}}; });
+  hr.height=22;
+  const dias=[...new Set(cargas.map(c=>c.fecha).filter(Boolean))].sort();
+  dias.forEach((d,i)=>{
+    const r=i+2, row=wd.getRow(r), td=totales(cargas.filter(c=>c.fecha===d).flatMap(c=>c.camiones||[]));
+    const A=`$A${r}`;
+    row.getCell(1).value=fechaUTC(d); row.getCell(1).numFmt="dd/mm/yyyy";
+    row.getCell(2).value=res(gKey.reduce((s,k)=>s+td[k].n,0)+td.sin.n,`COUNTIFS(${R("A")},${A})`);
+    gKey.forEach((k,j)=>{ row.getCell(3+j).value=res(Math.round(td[k].kg),`SUMIFS(${R("I")},${R("F")},"${GRUPOS[j].nombre}",${R("A")},${A})`); });
+    row.getCell(6).value=res(Math.round(td.sin.kg),`SUMIFS(${R("I")},${R("F")},"Sin CP",${R("A")},${A})`);
+    const tot=gKey.reduce((s,k)=>s+td[k].kg,0)+td.sin.kg, cl=gKey.reduce((s,k)=>s+td[k].kg,0), cp=gKey.reduce((s,k)=>s+td[k].kgcp,0);
+    row.getCell(7).value=res(Math.round(tot),`SUM(C${r}:F${r})`);
+    row.getCell(8).value=res(cl?+(cp/cl).toFixed(4):"",`IF(SUM(C${r}:E${r})=0,"",SUMPRODUCT((${R("A")}=${A})*(${R("F")}<>"Sin CP")*${R("I")}*${R("E")})/SUM(C${r}:E${r}))`);
+    for(let c=1;c<=8;c++){ const cell=row.getCell(c); cell.font={...F}; cell.border={bottom:thin(XC.linea)}; if(i%2) cell.fill=fill(XC.zebra);
+      if(c>=3&&c<=7) cell.numFmt="#,##0"; }
+    row.getCell(7).font={...F,bold:true}; row.getCell(8).numFmt="0.00";
+  });
+  const rt=dias.length+2, last=Math.max(2,dias.length+1), trow=wd.getRow(rt);
+  trow.getCell(1).value="Total";
+  [2,3,4,5,6,7].forEach(c=>{ const L=String.fromCharCode(64+c); trow.getCell(c).value={formula:`SUM(${L}2:${L}${last})`}; trow.getCell(c).numFmt=c===2?"0":"#,##0"; });
+  trow.getCell(8).value={formula:`IF(SUM(C2:E${last})=0,"",SUMPRODUCT((${R("F")}<>"Sin CP")*${R("I")}*${R("E")})/SUM(C2:E${last}))`}; trow.getCell(8).numFmt="0.00";
+  for(let c=1;c<=8;c++){ const cell=trow.getCell(c); cell.font={...F,bold:true,size:11}; cell.border={top:{style:"medium",color:{argb:XC.ink}}}; }
+  wd.getCell(`A${rt+2}`).value="Solo los listados cargados en la app (no incluye el punto de partida).";
+  wd.getCell(`A${rt+2}`).font={...F,size:9,italic:true,color:{argb:XC.gris}};
+
+  /* ===== Hoja Camiones ===== */
+  const wc=wb.addWorksheet("Camiones",{views:[{state:"frozen",ySplit:1}],properties:{tabColor:{argb:XC.g3}},pageSetup:{orientation:"landscape",fitToPage:true,fitToWidth:1,fitToHeight:0,paperSize:9}});
+  wc.columns=[{header:"Fecha",width:12},{header:"Patente",width:11},{header:"Código barra",width:13},{header:"Procedencia",width:24},
+    {header:"CP",width:7},{header:"Grupo",width:10},{header:"ksnetos",width:11},{header:"netopto",width:11},{header:`kg contados (${kgCampo})`,width:20}];
+  const h1=wc.getRow(1); h1.eachCell(c=>{ c.font={...F,bold:true,color:{argb:"FFFFFFFF"}}; c.fill=fill(XC.verde); c.alignment={vertical:"middle",horizontal:"center",wrapText:true}; }); h1.height=24;
+  cams.forEach((t,i)=>{
+    const g=grupoDe(t.cp), cd=/^\d+$/.test(t.c)?+t.c:t.c;
+    const row=wc.addRow([t.fecha?fechaUTC(t.fecha):"",t.p,cd,t.proc,t.cp>0?t.cp:null,nombreGrupo(t.cp),t.kg,t.kgp,kgDe(t)]);
+    row.eachCell({includeEmpty:true},c=>{ c.font={...F}; c.border={bottom:thin(XC.linea)}; });
+    row.getCell(1).numFmt="dd/mm/yyyy"; row.getCell(5).numFmt="0.0";
+    [7,8,9].forEach(k=>row.getCell(k).numFmt="#,##0");
+    const gc=row.getCell(6); gc.fill=fill(g?XC[g+"t"]:XC.sint); gc.font={...F,bold:!!g,italic:!g,color:{argb:g?XC.ink:XC.gris}};
+  });
+  wc.pageSetup.printTitlesRow="1:1"; wd.pageSetup.printTitlesRow="1:1";
+  wc.autoFilter={from:"A1",to:`I${Math.max(1,cams.length+1)}`};
+
+  /* ===== Registro interno (para abrir en la app) ===== */
+  const wr=wb.addWorksheet("_registro",{state:"veryHidden"});
+  const json=JSON.stringify({v:1,emitido:ahora.toISOString(),base,cargas});
+  for(let i=0,r=1;i<json.length;i+=30000,r++) wr.getCell(r,1).value=json.slice(i,i+30000);
+
+  return await wb.xlsx.writeBuffer();
+}
+
+async function exportar(){
+  let buf;
+  try{ buf=await construirExcel(); }catch(e){ console.error(e); toast("No se pudo armar el Excel."); return; }
+  const ult=[...new Set(cargas.map(c=>c.fecha).filter(Boolean))].sort().pop();
+  const nombre=`Trigo proteina - registro al ${ult?fechaCorta(ult).replace(/\//g,"-"):"inicio"}.xlsx`;
+  const blob=new Blob([buf],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"});
+  const u=URL.createObjectURL(blob), a=document.createElement("a");
+  a.href=u; a.download=nombre; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(u),4000);
+}
+
+/* ---------- ui wiring ---------- */
+let toastT;
+function toast(m){ const t=$("toast"); t.textContent=m; t.classList.add("on"); clearTimeout(toastT); toastT=setTimeout(()=>t.classList.remove("on"),2800); }
+const drop=$("drop"), fileIn=$("file");
+drop.addEventListener("keydown",e=>{ if(e.key==="Enter"||e.key===" "){ e.preventDefault(); fileIn.click(); }});
+fileIn.addEventListener("change",()=>{ if(fileIn.files[0]) leerArchivo(fileIn.files[0]); fileIn.value=""; });
+["dragenter","dragover"].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.add("over");}));
+["dragleave","drop"].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.remove("over");}));
+drop.addEventListener("drop",e=>{ const f=e.dataTransfer.files[0]; if(f) leerArchivo(f); });
+$("selDia").addEventListener("change",e=>{diaSel=e.target.value;render();});
+$("hist").addEventListener("click",e=>{ const b=e.target.closest("[data-del]"); if(b) quitar(b.dataset.del); });
+$("btnBase").onclick=()=>{ renderBaseForm(); $("baseCard").classList.remove("hidden"); $("baseCard").scrollIntoView({block:"nearest"}); };
+$("btnExport").onclick=exportar;
+
+function setStatus(msg,warn){ const s=$("status"); s.textContent=msg; s.classList.toggle("w",!!warn); s.classList.toggle("hidden",!msg); }
+
+/* ---------- pantalla de conexión ---------- */
+function codificar(o){ return btoa(unescape(encodeURIComponent(JSON.stringify(o)))).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,""); }
+function decodificar(s){ s=s.replace(/-/g,"+").replace(/_/g,"/"); while(s.length%4) s+="="; return JSON.parse(decodeURIComponent(escape(atob(s)))); }
+function linkParaOtraPC(){ return location.origin+location.pathname+"#conexion="+codificar(conn); }
+
+function renderConexion(){
+  const el=$("conexion");
+  if(conn){
+    el.innerHTML=`<div class="card-head"><h2>Conexión con la planilla</h2></div>
+      <p class="meta" style="margin:0 0 10px">Esta computadora está conectada. Para conectar otra, mandale este link (por WhatsApp o mail): al abrirlo queda conectada sola.</p>
+      <div class="conn-row"><input id="linkOtra" readonly value="${esc(linkParaOtraPC())}" aria-label="Link para otra computadora"><button id="btnCopiar">Copiar link</button></div>
+      <p class="meta" style="margin:8px 0 0">El link incluye la clave: pasáselo solo a quien tenga que cargar o mirar los datos.</p>
+      <div class="actions" style="margin-top:14px"><button id="btnDesconectar">Desconectar esta computadora</button><button id="btnCerrarConn">Cerrar</button></div>`;
+    $("btnCopiar").onclick=async()=>{ const i=$("linkOtra"); try{ await navigator.clipboard.writeText(i.value); toast("Link copiado"); }catch{ i.select(); document.execCommand("copy"); toast("Link copiado"); } };
+    $("btnDesconectar").onclick=()=>{ if(!confirm("¿Desconectar esta computadora de la planilla? Los datos no se borran: quedan en la planilla.")) return;
+      conn=null; guardarConexion(null); base=null; cargas=[]; canWrite=false; render(); renderConexion(); setStatus("Sin conexión con la planilla.",true); };
+    $("btnCerrarConn").onclick=()=>el.classList.add("hidden");
+  } else {
+    el.innerHTML=`<div class="card-head"><h2>Conectar con la planilla</h2></div>
+      <p class="meta" style="margin:0 0 12px">Pegá la dirección de la aplicación web (la que termina en /exec) y la clave del script. Se hace una sola vez por computadora.</p>
+      <div class="conn-form">
+        <label for="cUrl">Dirección</label><input id="cUrl" placeholder="https://script.google.com/macros/s/…/exec" autocomplete="off">
+        <label for="cClave">Clave</label><input id="cClave" autocomplete="off">
+      </div>
+      <div class="actions" style="margin-top:14px"><button class="primary" id="btnConectar">Conectar</button></div>`;
+    $("btnConectar").onclick=async()=>{
+      const url=$("cUrl").value.trim(), clave=$("cClave").value.trim();
+      if(!/^https:\/\/script\.google(usercontent)?\.com\//.test(url)){ toast("La dirección tiene que empezar con https://script.google.com/"); return; }
+      if(!clave){ toast("Falta la clave."); return; }
+      const b=$("btnConectar"); b.disabled=true; b.textContent="Probando…";
+      conn={url,clave};
+      try{ await api("estado"); guardarConexion(conn); canWrite=true; estadoConectado(); el.classList.add("hidden"); render(); toast("Conectado"); }
+      catch(e){ conn=null; b.disabled=false; b.textContent="Conectar"; toast(e.message||"No se pudo conectar."); }
+    };
+  }
+  el.classList.remove("hidden");
+}
+$("btnConn").onclick=()=>{ renderConexion(); $("conexion").scrollIntoView({block:"nearest"}); };
+$("btnActualizar").onclick=()=>actualizar(false);
+
+render();
+
+/* ---------- arranque ---------- */
+(()=>{
+  const m=location.hash.match(/^#conexion=([\w-]+)/);
+  if(m){
+    try{ const c=decodificar(m[1]); if(c&&c.url&&c.clave){ guardarConexion(c); } }catch{}
+    history.replaceState(null,"",location.pathname+location.search);
+  }
+  conn=leerConexion();
+  if(!conn){ setStatus("Esta computadora todavía no está conectada a la planilla.",true); renderConexion(); return; }
+  actualizar(false);
+  // Se actualiza sola cada minuto y al volver a la pestaña
+  setInterval(()=>{ if(document.visibilityState==="visible"&&!pendiente) actualizar(true); },60000);
+  document.addEventListener("visibilitychange",()=>{ if(document.visibilityState==="visible"&&!pendiente) actualizar(true); });
+})();
+})();
+</script>
+</body>
+</html>
