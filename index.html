@@ -582,6 +582,7 @@ const fill=c=>({type:"pattern",pattern:"solid",fgColor:{argb:c}});
 const thin=c=>({style:"thin",color:{argb:c}});
 
 async function construirExcel(){
+  const aTn=kg=>(kg||0)/1000;   // el Excel muestra toneladas; los kilos exactos quedan en ksnetos/netopto
   const wb=new ExcelJS.Workbook();
   wb.creator="Trigo por proteína"; wb.created=new Date();
   const F={name:"Arial",size:10};
@@ -608,7 +609,7 @@ async function construirExcel(){
   const t1=ws.getCell("B2"); t1.value="Divisiones de trigo por proteínas"; t1.font={name:"Arial",size:18,bold:true,color:{argb:XC.ink}};
   ws.getRow(2).height=28;
   ws.mergeCells("B3:H3");
-  const t2=ws.getCell("B3"); t2.value=`Kilos: ${CAMPOS[kgCampo].toLowerCase()}. Emitido el ${emitidoTxt}`; t2.font={...F,color:{argb:XC.gris}};
+  const t2=ws.getCell("B3"); t2.value=`En toneladas. Peso: ${CAMPOS[kgCampo].toLowerCase()}. Emitido el ${emitidoTxt}`; t2.font={...F,color:{argb:XC.gris}};
 
   const P=23; // partida rows 24..26
   function titulo(r,txt){
@@ -644,17 +645,17 @@ async function construirExcel(){
 
   // ---- Acumulado (rows 5..11)
   titulo(5,"Acumulado");
-  encabezado(6,["Grupo","Prot. 13,5","Base seca","","kg","%","Promedio CP"]);
+  encabezado(6,["Grupo","Prot. 13,5","Base seca","","Toneladas","%","Promedio CP"]);
   const totA=gKey.reduce((s,k)=>s+a[k].kg,0)+a.sin.kg, clasA=gKey.reduce((s,k)=>s+a[k].kg,0), cpA=gKey.reduce((s,k)=>s+a[k].kgcp,0);
   GRUPOS.forEach((g,i)=>{ const r=7+i, pr=P+1+i, x=a[g.id];
     filaGrupo(r,i,{
-      6:res(Math.round(x.kg),`F${pr}+SUMIFS(${R("I")},${R("F")},"${g.nombre}")`),
+      6:res(aTn(x.kg),`F${pr}+SUMIFS(${R("I")},${R("F")},"${g.nombre}")`),
       7:res(totA?x.kg/totA:0,`IF($F$11=0,0,F${r}/$F$11)`),
       8:res(x.kg?+(x.kgcp/x.kg).toFixed(4):"",`IF(F${r}=0,"",(F${pr}*H${pr}+SUMPRODUCT((${R("F")}="${g.nombre}")*${R("I")}*${R("E")}))/F${r})`)});
   });
-  filaGrupo(10,-1,{6:res(Math.round(a.sin.kg),`SUMIFS(${R("I")},${R("F")},"Sin CP")`),7:res(totA?a.sin.kg/totA:0,`IF($F$11=0,0,F10/$F$11)`),8:"–"});
+  filaGrupo(10,-1,{6:res(aTn(a.sin.kg),`SUMIFS(${R("I")},${R("F")},"Sin CP")`),7:res(totA?a.sin.kg/totA:0,`IF($F$11=0,0,F10/$F$11)`),8:"–"});
   filaTotal(11);
-  ws.getCell("F11").value=res(Math.round(totA),"SUM(F7:F10)");
+  ws.getCell("F11").value=res(aTn(totA),"SUM(F7:F10)");
   ws.getCell("G11").value=res(totA?1:0,"IF(F11=0,0,SUM(G7:G10))");
   ws.getCell("H11").value=res(clasA?+(cpA/clasA).toFixed(4):"",`IF(SUM(F7:F9)=0,"",SUMPRODUCT(F7:F9,H7:H9)/SUM(F7:F9))`);
 
@@ -664,19 +665,19 @@ async function construirExcel(){
   const fd=ws.getCell("H13"); fd.value=dia?fechaUTC(dia):""; fd.numFmt="dd/mm/yyyy"; fd.font={...F,bold:true,size:11}; fd.alignment={horizontal:"right",vertical:"middle"};
   for(let k=2;k<=8;k++) ws.getCell(13,k).border={bottom:{style:"medium",color:{argb:XC.verde}}};
   ws.getCell("B13").value="Del día"; ws.getCell("B13").font={name:"Arial",size:13,bold:true,color:{argb:XC.verde}};
-  encabezado(14,["Grupo","Prot. 13,5","Base seca","Camiones","kg","%","Promedio CP"]);
+  encabezado(14,["Grupo","Prot. 13,5","Base seca","Camiones","Toneladas","%","Promedio CP"]);
   const totD=gKey.reduce((s,k)=>s+tDia[k].kg,0)+tDia.sin.kg, clasD=gKey.reduce((s,k)=>s+tDia[k].kg,0), cpD=gKey.reduce((s,k)=>s+tDia[k].kgcp,0);
   GRUPOS.forEach((g,i)=>{ const r=15+i, x=tDia[g.id];
     filaGrupo(r,i,{
       5:res(x.n,`COUNTIFS(${R("F")},"${g.nombre}",${R("A")},$H$13)`),
-      6:res(Math.round(x.kg),`SUMIFS(${R("I")},${R("F")},"${g.nombre}",${R("A")},$H$13)`),
+      6:res(aTn(x.kg),`SUMIFS(${R("I")},${R("F")},"${g.nombre}",${R("A")},$H$13)`),
       7:res(totD?x.kg/totD:0,`IF($F$19=0,0,F${r}/$F$19)`),
       8:res(x.kg?+(x.kgcp/x.kg).toFixed(4):"",`IF(F${r}=0,"",SUMPRODUCT((${R("F")}="${g.nombre}")*(${R("A")}=$H$13)*${R("I")}*${R("E")})/F${r})`)});
   });
-  filaGrupo(18,-1,{5:res(tDia.sin.n,`COUNTIFS(${R("F")},"Sin CP",${R("A")},$H$13)`),6:res(Math.round(tDia.sin.kg),`SUMIFS(${R("I")},${R("F")},"Sin CP",${R("A")},$H$13)`),7:res(totD?tDia.sin.kg/totD:0,`IF($F$19=0,0,F18/$F$19)`),8:"–"});
+  filaGrupo(18,-1,{5:res(tDia.sin.n,`COUNTIFS(${R("F")},"Sin CP",${R("A")},$H$13)`),6:res(aTn(tDia.sin.kg),`SUMIFS(${R("I")},${R("F")},"Sin CP",${R("A")},$H$13)`),7:res(totD?tDia.sin.kg/totD:0,`IF($F$19=0,0,F18/$F$19)`),8:"–"});
   filaTotal(19);
   ws.getCell("E19").value=res(gKey.reduce((s,k)=>s+tDia[k].n,0)+tDia.sin.n,"SUM(E15:E18)");
-  ws.getCell("F19").value=res(Math.round(totD),"SUM(F15:F18)");
+  ws.getCell("F19").value=res(aTn(totD),"SUM(F15:F18)");
   ws.getCell("G19").value=res(totD?1:0,"IF(F19=0,0,SUM(G15:G18))");
   ws.getCell("H19").value=res(clasD?+(cpD/clasD).toFixed(4):"",`IF(SUM(F15:F17)=0,"",SUMPRODUCT(F15:F17,H15:H17)/SUM(F15:F17))`);
   ws.getCell("B20").value="Para ver otro día, cambiá la fecha de la celda H13.";
@@ -684,12 +685,12 @@ async function construirExcel(){
 
   // ---- Punto de partida (rows 22..26)
   ws.mergeCells("B22:H22");
-  ws.getCell("B22").value="Punto de partida (kilos y promedio antes del primer listado cargado en la app)";
+  ws.getCell("B22").value="Punto de partida (toneladas y promedio antes del primer listado cargado en la app)";
   ws.getCell("B22").font={...F,bold:true,color:{argb:XC.gris}};
-  ["Grupo","","","","kg","","Promedio CP"].forEach((v,i)=>{ const c=ws.getCell(P,i+2); c.value=v||null; c.font={...F,bold:true,color:{argb:XC.gris}}; c.border={bottom:thin(XC.linea)}; c.alignment={horizontal:i<3?"left":"right"}; });
+  ["Grupo","","","","Toneladas","","Promedio CP"].forEach((v,i)=>{ const c=ws.getCell(P,i+2); c.value=v||null; c.font={...F,bold:true,color:{argb:XC.gris}}; c.border={bottom:thin(XC.linea)}; c.alignment={horizontal:i<3?"left":"right"}; });
   GRUPOS.forEach((g,i)=>{ const r=P+1+i, b=base&&base[g.id]||{};
     ws.getCell(r,2).value=g.nombre; ws.getCell(r,2).font={...F,color:{argb:XC.gris}};
-    const k=ws.getCell(r,6); k.value=num(b.kg); k.numFmt="#,##0"; k.font={...F,color:{argb:XC.azul}};
+    const k=ws.getCell(r,6); k.value=aTn(num(b.kg)); k.numFmt="#,##0.000"; k.font={...F,color:{argb:XC.azul}};
     const pp=ws.getCell(r,8); pp.value=num(b.prom); pp.numFmt="0.00"; pp.font={...F,color:{argb:XC.azul}};
     for(let c=2;c<=8;c++) ws.getCell(r,c).border={bottom:thin(XC.linea)};
   });
@@ -698,7 +699,7 @@ async function construirExcel(){
 
   /* ===== Hoja Por día ===== */
   const wd=wb.addWorksheet("Por día",{views:[{state:"frozen",ySplit:1,showGridLines:false}],properties:{tabColor:{argb:XC.g1}},pageSetup:{orientation:"landscape",fitToPage:true,fitToWidth:1,fitToHeight:0,paperSize:9}});
-  const hdD=["Fecha","Camiones","Grupo 1 kg","Grupo 2 kg","Grupo 3 kg","Sin CP kg","Total kg","Promedio CP"];
+  const hdD=["Fecha","Camiones","Grupo 1 tn","Grupo 2 tn","Grupo 3 tn","Sin CP tn","Total tn","Promedio CP"];
   wd.columns=[{width:12},{width:11},{width:14},{width:14},{width:14},{width:12},{width:15},{width:13}];
   const hr=wd.getRow(1); hdD.forEach((v,i)=>{ const c=hr.getCell(i+1); c.value=v; c.font={...F,bold:true,color:{argb:"FFFFFFFF"}}; c.fill=fill(XC.verde); c.alignment={horizontal:i?"right":"left",vertical:"middle"}; });
   [3,4,5].forEach((ci,i)=>{ hr.getCell(ci).border={bottom:{style:"thick",color:{argb:XC[gKey[i]]}}}; });
@@ -709,10 +710,10 @@ async function construirExcel(){
     const A=`$A${r}`;
     row.getCell(1).value=fechaUTC(d); row.getCell(1).numFmt="dd/mm/yyyy";
     row.getCell(2).value=res(gKey.reduce((s,k)=>s+td[k].n,0)+td.sin.n,`COUNTIFS(${R("A")},${A})`);
-    gKey.forEach((k,j)=>{ row.getCell(3+j).value=res(Math.round(td[k].kg),`SUMIFS(${R("I")},${R("F")},"${GRUPOS[j].nombre}",${R("A")},${A})`); });
-    row.getCell(6).value=res(Math.round(td.sin.kg),`SUMIFS(${R("I")},${R("F")},"Sin CP",${R("A")},${A})`);
+    gKey.forEach((k,j)=>{ row.getCell(3+j).value=res(aTn(td[k].kg),`SUMIFS(${R("I")},${R("F")},"${GRUPOS[j].nombre}",${R("A")},${A})`); });
+    row.getCell(6).value=res(aTn(td.sin.kg),`SUMIFS(${R("I")},${R("F")},"Sin CP",${R("A")},${A})`);
     const tot=gKey.reduce((s,k)=>s+td[k].kg,0)+td.sin.kg, cl=gKey.reduce((s,k)=>s+td[k].kg,0), cp=gKey.reduce((s,k)=>s+td[k].kgcp,0);
-    row.getCell(7).value=res(Math.round(tot),`SUM(C${r}:F${r})`);
+    row.getCell(7).value=res(aTn(tot),`SUM(C${r}:F${r})`);
     row.getCell(8).value=res(cl?+(cp/cl).toFixed(4):"",`IF(SUM(C${r}:E${r})=0,"",SUMPRODUCT((${R("A")}=${A})*(${R("F")}<>"Sin CP")*${R("I")}*${R("E")})/SUM(C${r}:E${r}))`);
     for(let c=1;c<=8;c++){ const cell=row.getCell(c); cell.font={...F}; cell.border={bottom:thin(XC.linea)}; if(i%2) cell.fill=fill(XC.zebra);
       if(c>=3&&c<=7) cell.numFmt="#,##0"; }
@@ -729,14 +730,14 @@ async function construirExcel(){
   /* ===== Hoja Camiones ===== */
   const wc=wb.addWorksheet("Camiones",{views:[{state:"frozen",ySplit:1}],properties:{tabColor:{argb:XC.g3}},pageSetup:{orientation:"landscape",fitToPage:true,fitToWidth:1,fitToHeight:0,paperSize:9}});
   wc.columns=[{header:"Fecha",width:12},{header:"Patente",width:11},{header:"Código barra",width:13},{header:"Procedencia",width:24},
-    {header:"CP",width:7},{header:"Grupo",width:10},{header:"ksnetos",width:11},{header:"netopto",width:11},{header:`kg contados (${kgCampo})`,width:20},{header:"CTG",width:14}];
+    {header:"CP",width:7},{header:"Grupo",width:10},{header:"ksnetos (kg)",width:13},{header:"netopto (kg)",width:13},{header:`Toneladas (${kgCampo})`,width:20},{header:"CTG",width:14}];
   const h1=wc.getRow(1); h1.eachCell(c=>{ c.font={...F,bold:true,color:{argb:"FFFFFFFF"}}; c.fill=fill(XC.verde); c.alignment={vertical:"middle",horizontal:"center",wrapText:true}; }); h1.height=24;
   cams.forEach((t,i)=>{
     const g=grupoDe(t.cp), cd=/^\d+$/.test(t.c)?+t.c:t.c;
-    const row=wc.addRow([t.fecha?fechaUTC(t.fecha):"",t.p,cd,t.proc,t.cp>0?t.cp:null,nombreGrupo(t.cp),t.kg,t.kgp,kgDe(t),t.ctg?(/^\d+$/.test(t.ctg)?+t.ctg:t.ctg):""]);
+    const row=wc.addRow([t.fecha?fechaUTC(t.fecha):"",t.p,cd,t.proc,t.cp>0?t.cp:null,nombreGrupo(t.cp),t.kg,t.kgp,aTn(kgDe(t)),t.ctg?(/^\d+$/.test(t.ctg)?+t.ctg:t.ctg):""]);
     row.eachCell({includeEmpty:true},c=>{ c.font={...F}; c.border={bottom:thin(XC.linea)}; });
     row.getCell(1).numFmt="dd/mm/yyyy"; row.getCell(5).numFmt="0.0"; row.getCell(10).numFmt="0";
-    [7,8,9].forEach(k=>row.getCell(k).numFmt="#,##0");
+    [7,8].forEach(k=>row.getCell(k).numFmt="#,##0"); row.getCell(9).numFmt="#,##0";
     const gc=row.getCell(6); gc.fill=fill(g?XC[g+"t"]:XC.sint); gc.font={...F,bold:!!g,italic:!g,color:{argb:g?XC.ink:XC.gris}};
   });
   wc.pageSetup.printTitlesRow="1:1"; wd.pageSetup.printTitlesRow="1:1";
