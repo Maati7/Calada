@@ -74,7 +74,7 @@ button.link{border:0;background:none;padding:.2rem .3rem;color:var(--muted);text
 .notes .w{background:var(--warn-bg);color:var(--warn)}
 .notes .o{background:var(--ok-bg)}
 
-.grid{display:grid;grid-template-columns:1fr 1fr;gap:22px}
+.grid{display:grid;grid-template-columns:1fr;gap:22px}
 .grid>*{min-width:0}
 @media (max-width:1000px){.grid{grid-template-columns:1fr}}
 .card{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:18px 20px}
@@ -113,6 +113,13 @@ details.trucks table{font-size:.86rem;margin-top:8px}
 .conn-form{display:grid;grid-template-columns:auto 1fr;gap:8px 12px;align-items:center}
 .conn-form input,.conn-row input{width:100%;min-width:0}
 .conn-row{display:flex;gap:8px}
+.cpbox{border:1px solid var(--line);border-left:4px solid var(--sincp);border-radius:8px;padding:12px 14px;margin:0 0 14px;background:var(--bg)}
+.cpbox h3{margin:0 0 .2rem;font-size:1rem}
+.cpbox .meta{margin:0 0 8px}
+table.cptable{min-width:480px}
+td.cpcell{width:7.5rem}
+.cpin{width:6.5rem;text-align:right}
+.cpin.bad{border-color:var(--warn);background:var(--warn-bg)}
 </style>
 </head>
 <body>
@@ -152,6 +159,8 @@ details.trucks table{font-size:.86rem;margin-top:8px}
 
   <section class="card hidden" id="baseCard" style="margin-bottom:22px"></section>
 
+  <section class="card hidden" id="sinCp" style="margin-bottom:22px"></section>
+
   <div class="grid">
     <section class="card">
       <div class="card-head">
@@ -188,7 +197,7 @@ const GRUPOS=[
 const CAMPOS={ksnetos:"Neto con mermas (ksnetos)",netopto:"Neto en planta (netopto)"};
 const LS_CONN="trigoProteina.conexion";
 const $=id=>document.getElementById(id);
-const fmtKg=n=>((n||0)/1000).toLocaleString("es-AR",{minimumFractionDigits:3,maximumFractionDigits:3});
+const fmtKg=n=>Math.round((n||0)/1000).toLocaleString("es-AR");
 const fmtCp=n=>(n==null||!isFinite(n))?"–":n.toLocaleString("es-AR",{minimumFractionDigits:2,maximumFractionDigits:2});
 const fmtPct=n=>(isFinite(n)?n:0).toLocaleString("es-AR",{maximumFractionDigits:1})+" %";
 const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -216,6 +225,7 @@ const fechaUTC=iso=>{ const [y,m,d]=iso.split("-").map(Number); return new Date(
 let conn=null, canWrite=false;
 let base=null, cargas=[], pendiente=null, diaSel="";
 let ultimaLectura=null, leyendo=false;
+const editsCP={};   // proteína escrita a mano, por código de barra, antes de guardar
 
 const campo=()=>(base&&base.campo)||"ksnetos";
 const kgDe=c=>campo()==="netopto"?(c.kgp||0):(c.kg||0);
@@ -293,7 +303,7 @@ function render(){
   const ult=cargas.length?cargas.map(c=>c.fecha).filter(Boolean).sort().pop():"";
   $("siloMeta").textContent=cargas.length?`Último día cargado: ${fechaCorta(ult)}`:"Todavía no se cargó ningún listado";
   const parts=[...GRUPOS.map(g=>({c:`var(--${g.id})`,kg:a[g.id].kg,n:g.nombre})), {c:"var(--sincp)",kg:a.sin.kg,n:"Sin CP"}];
-  $("bar").innerHTML=parts.map(p=>`<span style="width:${totKg?p.kg/totKg*100:0}%;background:${p.c}" title="${p.n}: ${fmtKg(p.kg)} t"></span>`).join("");
+  $("bar").innerHTML=parts.map(p=>`<span style="width:${totKg?p.kg/totKg*100:0}%;background:${p.c}" title="${p.n}: ${fmtKg(p.kg)} tn"></span>`).join("");
   $("legend").innerHTML=parts.filter(p=>p.kg>0||p.n!=="Sin CP").map(p=>`<span><span class="dot" style="background:${p.c}"></span>${p.n} <b>${fmtPct(totKg?p.kg/totKg*100:0)}</b></span>`).join("");
 
   $("tAcu").innerHTML=tabla(a,false);
@@ -313,6 +323,7 @@ function render(){
     $("diaTrucks").classList.add("hidden");
   }
   renderHist();
+  renderSinCP();
   $("btnExport").classList.toggle("hidden",!(puedeExportar()&&(cargas.length||base)));
   $("btnBase").disabled=!canWrite;
   if(!$("baseCard").classList.contains("hidden")) renderBaseForm();
@@ -320,8 +331,8 @@ function render(){
 
 function tablaCamiones(cams){
   const rows=[...cams].sort((x,y)=>(x.cp||0)-(y.cp||0));
-  return `<div class="scroll"><table><thead><tr><th>Patente</th><th>Procedencia</th><th>CP</th><th>Grupo</th><th>Toneladas</th></tr></thead><tbody>`+
-    rows.map(c=>`<tr><td>${esc(c.p)}</td><td>${esc(c.proc)}</td><td>${c.cp>0?fmtCp(c.cp):"–"}</td><td>${nombreGrupo(c.cp)}</td><td>${fmtKg(kgDe(c))}</td></tr>`).join("")+
+  return `<div class="scroll"><table><thead><tr><th>Patente</th><th>CTG</th><th>Procedencia</th><th>CP</th><th>Grupo</th><th>Toneladas</th></tr></thead><tbody>`+
+    rows.map(c=>`<tr><td>${esc(c.p)}</td><td>${esc(c.ctg||"–")}</td><td>${esc(c.proc)}</td><td>${c.cp>0?fmtCp(c.cp):"–"}</td><td>${nombreGrupo(c.cp)}</td><td>${fmtKg(kgDe(c))}</td></tr>`).join("")+
     `</tbody></table></div>`;
 }
 
@@ -333,6 +344,39 @@ function renderHist(){
       const when=c.cargadoEn?new Date(c.cargadoEn).toLocaleString("es-AR",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"}):"";
       return `<tr><td>${fechaCorta(c.fecha)}</td><td>${esc(c.archivo)}</td><td>${(c.camiones||[]).length}</td><td>${fmtKg(kg)}</td><td>${when}</td><td>${canWrite?`<button class="link" data-del="${esc(c.id)}">Quitar</button>`:""}</td></tr>`;}).join("")+
     `</tbody></table>`;
+}
+
+function renderSinCP(){
+  const el=$("sinCp");
+  const lista=[];
+  for(const c of cargas) for(const t of c.camiones||[]) if(!(t.cp>0)&&t.c) lista.push({...t,fecha:c.fecha});
+  const vivos=new Set(lista.map(t=>t.c)); for(const k in editsCP) if(!vivos.has(k)) delete editsCP[k];
+  if(!lista.length){ el.classList.add("hidden"); el.innerHTML=""; return; }
+  if(el.contains(document.activeElement)) return;   // no re-dibujar mientras alguien escribe
+  lista.sort((a,b)=>(a.fecha||"").localeCompare(b.fecha||""));
+  const tn=lista.reduce((s,t)=>s+kgDe(t),0);
+  el.innerHTML=`<div class="card-head"><h2>Camiones sin proteína</h2><span class="meta">${lista.length} camiones, ${fmtKg(tn)} tn</span></div>
+    <p class="meta" style="margin:0 0 10px">Están sumados como “Sin CP”. Cargá la proteína y tocá Guardar: pasan a su grupo.</p>
+    ${tablaCP(lista.map(t=>filaCP(t,t.c,editsCP[t.c])).join(""))}
+    <div class="actions" style="margin-top:12px"><button class="primary" id="btnGuardarCP"${canWrite?"":" disabled"}>Guardar proteínas</button></div>`;
+  el.classList.remove("hidden");
+  el.querySelectorAll(".cpin").forEach(inp=>{
+    inp.classList.toggle("bad",Number.isNaN(leerCP(inp.value)));
+    inp.addEventListener("input",()=>{ const k=inp.dataset.k; if(inp.value.trim()) editsCP[k]=inp.value; else delete editsCP[k];
+      inp.classList.toggle("bad",Number.isNaN(leerCP(inp.value))); });
+  });
+  $("btnGuardarCP").onclick=guardarCPManual;
+}
+async function guardarCPManual(){
+  const lista=[]; let malas=0;
+  for(const [c,v] of Object.entries(editsCP)){ const cp=leerCP(v); if(cp>0) lista.push({c,cp}); else if(Number.isNaN(cp)) malas++; }
+  if(malas){ toast("Hay una proteína mal escrita. Tiene que ser un número entre 4 y 25, por ejemplo 9,5."); return; }
+  if(!lista.length){ toast("No cargaste ninguna proteína todavía."); return; }
+  const b=$("btnGuardarCP"); b.disabled=true; b.textContent="Guardando…";
+  try{ await api("cp",{lista}); for(const x of lista) delete editsCP[x.c]; estadoConectado();
+    if(document.activeElement) document.activeElement.blur(); render();
+    toast(lista.length===1?"Proteína guardada":`${lista.length} proteínas guardadas`); }
+  catch(err){ b.disabled=false; b.textContent="Guardar proteínas"; toast(err instanceof ErrorPlanilla?err.message:"No se pudo guardar. Probá de nuevo."); }
 }
 
 /* ---------- file reading ---------- */
@@ -352,7 +396,8 @@ function leerArchivo(file){
       const camiones=rows.map(r=>{const o={};for(const k in r)o[k.toLowerCase().trim()]=r[k];return o;})
         .filter(o=>o.patente||o.codbarra)
         .map(o=>({c:String(o.codbarra||"").trim(),p:String(o.patente||"").trim(),f:fechaISO(o.fechatara),
-          cp:num(o.cp),kg:num(o.ksnetos),kgp:num(o.netopto),proc:String(o.nomproce||"").trim(),prod:String(o.nompro||"").trim()}));
+          cp:num(o.cp),kg:num(o.ksnetos),kgp:num(o.netopto),proc:String(o.nomproce||"").trim(),prod:String(o.nompro||"").trim(),
+          ctg:String(o.ctaporte??"").trim()}));
       if(!camiones.length) throw new Error("El archivo no tiene camiones.");
       prepararPendiente(file.name,camiones);
     }catch(err){ mostrarError(err.message||String(err)); }
@@ -397,21 +442,32 @@ function renderPreview(){
   if(p.tipo==="registro") return renderPreviewRegistro();
   const t=totales(p.nuevos), kg=GRUPOS.reduce((s,g)=>s+t[g.id].kg,0)+t.sin.kg;
   const notas=[];
-  if(p.nuevos.length) notas.push(`<li class="o">${p.nuevos.length} camiones nuevos, ${fmtKg(kg)} t${p.fechas.length?` del ${p.fechas.map(fechaCorta).join(", ")}`:""}.</li>`);
+  if(p.nuevos.length) notas.push(`<li class="o">${p.nuevos.length} camiones nuevos, ${fmtKg(kg)} tn${p.fechas.length?` del ${p.fechas.map(fechaCorta).join(", ")}`:""}.</li>`);
   if(p.repetidos.length) notas.push(`<li class="w">${p.repetidos.length} camiones ya estaban cargados (mismo código de barra) y no se van a sumar de nuevo.</li>`);
   if(p.completar.length) notas.push(`<li class="o">${p.completar.length} camiones que estaban sin CP ahora traen análisis: se les completa la proteína y pasan a su grupo.</li>`);
-  if(t.sin.n) notas.push(`<li class="w">${t.sin.n} camiones sin CP (${fmtKg(t.sin.kg)} t). Se suman como "Sin CP" y se clasifican cuando cargues un listado que traiga el análisis.</li>`);
+  if(t.sin.n) notas.push(`<li class="w">${t.sin.n} camiones sin CP (${fmtKg(t.sin.kg)} tn). Podés cargar la proteína acá abajo; si no, quedan como “Sin CP” hasta que la completes.</li>`);
   if(p.productos.some(x=>!/trigo/i.test(x))) notas.push(`<li class="w">El listado trae otros productos además de trigo: ${esc(p.productos.join(", "))}.</li>`);
   if(p.fechas.length>1) notas.push(`<li class="w">El listado tiene camiones de ${p.fechas.length} días distintos. Cada uno se va a ver en su día.</li>`);
   const hay=p.nuevos.length||p.completar.length;
+  const sinIdx=p.nuevos.map((x,i)=>[x,i]).filter(([x])=>!(x.cp>0)||x.cpManual);
+  const editor=sinIdx.length?`<div class="cpbox"><h3>Proteína de los camiones sin CP</h3>
+      <p class="meta">Si ya la tenés, cargala acá. Si no, dejala vacía: el camión queda como “Sin CP” y la completás después.</p>
+      ${tablaCP(sinIdx.map(([x,i])=>filaCP(x,"n"+i,x.cpManual?String(x.cp).replace(".",","):"")).join(""))}</div>`:"";
   el.innerHTML=`<h2>${esc(p.archivo)}</h2><ul class="notes">${notas.join("")||`<li class="w">Todos los camiones de este listado ya estaban cargados.</li>`}</ul>`+
-    (p.nuevos.length?`<div class="scroll"><table>${tabla(t,true)}</table></div>`:"")+
+    editor+
+    (p.nuevos.length?`<div class="scroll"><table id="prevTabla">${tabla(t,true)}</table></div>`:"")+
     `<div class="actions" style="margin-top:14px">`+
     (hay?`<button class="primary" id="btnConfirm"${canWrite?"":" disabled"}>Sumar al acumulado</button>`:"")+
     `<button id="btnCancel">${hay?"Cancelar":"Cerrar"}</button></div>`;
   el.classList.remove("hidden");
   $("btnCancel").onclick=()=>{pendiente=null;renderPreview();};
   if(hay) $("btnConfirm").onclick=confirmar;
+  el.querySelectorAll(".cpin").forEach(inp=>inp.addEventListener("input",()=>{
+    const i=+inp.dataset.k.slice(1), t=p.nuevos[i], v=leerCP(inp.value);
+    inp.classList.toggle("bad",Number.isNaN(v));
+    if(v>0){ t.cp=v; t.cpManual=true; } else if(t.cpManual){ t.cp=0; t.cpManual=false; }
+    const tb=$("prevTabla"); if(tb) tb.innerHTML=tabla(totales(p.nuevos),true);
+  }));
   el.scrollIntoView({behavior:matchMedia("(prefers-reduced-motion: reduce)").matches?"auto":"smooth",block:"nearest"});
 }
 
@@ -437,14 +493,24 @@ function mostrarError(msg){
   $("btnCancel").onclick=()=>{$("preview").classList.add("hidden");};
 }
 
+function leerCP(v){ const s=String(v||"").trim(); if(!s) return null; const n=num(s); return (n>=4&&n<=25)?n:NaN; }
+function filaCP(t,key,valor){
+  return `<tr><td>${esc(t.p)}</td><td>${esc(t.ctg||"–")}</td><td>${esc(t.proc)}</td><td>${fmtKg(kgDe(t))}</td>
+    <td class="cpcell"><input type="text" inputmode="decimal" class="cpin" data-k="${esc(key)}" value="${esc(valor||"")}" placeholder="ej. 9,5" aria-label="Proteína del camión ${esc(t.p)}"></td></tr>`;
+}
+function tablaCP(filas){
+  return `<div class="scroll"><table class="cptable"><thead><tr><th>Patente</th><th>CTG</th><th>Procedencia</th><th>Toneladas</th><th>CP</th></tr></thead><tbody>${filas}</tbody></table></div>`;
+}
+
 const nuevoId=f=>(f||"sf")+"_"+Date.now().toString(36)+Math.random().toString(36).slice(2,6);
 
 async function confirmar(){
   const p=pendiente; if(!p) return;
+  if($("preview").querySelector(".cpin.bad")){ toast("Hay una proteína mal escrita. Tiene que ser un número entre 4 y 25, por ejemplo 9,5."); return; }
   const btn=$("btnConfirm"); btn.disabled=true; btn.textContent="Guardando…";
   try{
     const porDia={};
-    for(const t of p.nuevos){ (porDia[t.f||""] ||= []).push({c:t.c,p:t.p,cp:t.cp,kg:t.kg,kgp:t.kgp,proc:t.proc}); }
+    for(const t of p.nuevos){ (porDia[t.f||""] ||= []).push({c:t.c,p:t.p,cp:t.cp,kg:t.kg,kgp:t.kgp,proc:t.proc,ctg:t.ctg||""}); }
     const ahora=new Date().toISOString();
     const nuevas=Object.entries(porDia).map(([f,cams])=>({id:nuevoId(f),archivo:p.archivo,fecha:f,cargadoEn:ahora,camiones:cams}));
     const upd={};
@@ -465,7 +531,7 @@ async function abrirRegistro(){
   const btn=$("btnConfirm"); btn.disabled=true; btn.textContent="Abriendo…";
   try{
     const nb={campo:d.base.campo||"ksnetos"}; for(const g of GRUPOS) nb[g.id]={kg:num(d.base[g.id]&&d.base[g.id].kg),prom:num(d.base[g.id]&&d.base[g.id].prom)};
-    const nc=d.cargas.map(c=>({id:c.id||nuevoId(c.fecha),archivo:c.archivo||"",fecha:c.fecha||"",cargadoEn:c.cargadoEn||"",camiones:(c.camiones||[]).map(t=>({c:String(t.c||""),p:String(t.p||""),cp:num(t.cp),kg:num(t.kg),kgp:num(t.kgp),proc:String(t.proc||"")}))}));
+    const nc=d.cargas.map(c=>({id:c.id||nuevoId(c.fecha),archivo:c.archivo||"",fecha:c.fecha||"",cargadoEn:c.cargadoEn||"",camiones:(c.camiones||[]).map(t=>({c:String(t.c||""),p:String(t.p||""),cp:num(t.cp),kg:num(t.kg),kgp:num(t.kgp),proc:String(t.proc||""),ctg:String(t.ctg||"")}))}));
     await api("reemplazar",{base:nb,cargas:nc});
     estadoConectado();
     diaSel="";
@@ -663,18 +729,18 @@ async function construirExcel(){
   /* ===== Hoja Camiones ===== */
   const wc=wb.addWorksheet("Camiones",{views:[{state:"frozen",ySplit:1}],properties:{tabColor:{argb:XC.g3}},pageSetup:{orientation:"landscape",fitToPage:true,fitToWidth:1,fitToHeight:0,paperSize:9}});
   wc.columns=[{header:"Fecha",width:12},{header:"Patente",width:11},{header:"Código barra",width:13},{header:"Procedencia",width:24},
-    {header:"CP",width:7},{header:"Grupo",width:10},{header:"ksnetos",width:11},{header:"netopto",width:11},{header:`kg contados (${kgCampo})`,width:20}];
+    {header:"CP",width:7},{header:"Grupo",width:10},{header:"ksnetos",width:11},{header:"netopto",width:11},{header:`kg contados (${kgCampo})`,width:20},{header:"CTG",width:14}];
   const h1=wc.getRow(1); h1.eachCell(c=>{ c.font={...F,bold:true,color:{argb:"FFFFFFFF"}}; c.fill=fill(XC.verde); c.alignment={vertical:"middle",horizontal:"center",wrapText:true}; }); h1.height=24;
   cams.forEach((t,i)=>{
     const g=grupoDe(t.cp), cd=/^\d+$/.test(t.c)?+t.c:t.c;
-    const row=wc.addRow([t.fecha?fechaUTC(t.fecha):"",t.p,cd,t.proc,t.cp>0?t.cp:null,nombreGrupo(t.cp),t.kg,t.kgp,kgDe(t)]);
+    const row=wc.addRow([t.fecha?fechaUTC(t.fecha):"",t.p,cd,t.proc,t.cp>0?t.cp:null,nombreGrupo(t.cp),t.kg,t.kgp,kgDe(t),t.ctg?(/^\d+$/.test(t.ctg)?+t.ctg:t.ctg):""]);
     row.eachCell({includeEmpty:true},c=>{ c.font={...F}; c.border={bottom:thin(XC.linea)}; });
-    row.getCell(1).numFmt="dd/mm/yyyy"; row.getCell(5).numFmt="0.0";
+    row.getCell(1).numFmt="dd/mm/yyyy"; row.getCell(5).numFmt="0.0"; row.getCell(10).numFmt="0";
     [7,8,9].forEach(k=>row.getCell(k).numFmt="#,##0");
     const gc=row.getCell(6); gc.fill=fill(g?XC[g+"t"]:XC.sint); gc.font={...F,bold:!!g,italic:!g,color:{argb:g?XC.ink:XC.gris}};
   });
   wc.pageSetup.printTitlesRow="1:1"; wd.pageSetup.printTitlesRow="1:1";
-  wc.autoFilter={from:"A1",to:`I${Math.max(1,cams.length+1)}`};
+  wc.autoFilter={from:"A1",to:`J${Math.max(1,cams.length+1)}`};
 
   /* ===== Registro interno (para abrir en la app) ===== */
   const wr=wb.addWorksheet("_registro",{state:"veryHidden"});
@@ -764,8 +830,9 @@ render();
   if(!conn){ setStatus("Esta computadora todavía no está conectada a la planilla.",true); renderConexion(); return; }
   actualizar(false);
   // Se actualiza sola cada minuto y al volver a la pestaña
-  setInterval(()=>{ if(document.visibilityState==="visible"&&!pendiente) actualizar(true); },60000);
-  document.addEventListener("visibilitychange",()=>{ if(document.visibilityState==="visible"&&!pendiente) actualizar(true); });
+  const libre=()=>document.visibilityState==="visible"&&!pendiente&&!Object.keys(editsCP).length;
+  setInterval(()=>{ if(libre()) actualizar(true); },60000);
+  document.addEventListener("visibilitychange",()=>{ if(libre()) actualizar(true); });
 })();
 })();
 </script>
