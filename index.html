@@ -242,7 +242,8 @@ const fechaUTC=iso=>{ const [y,m,d]=iso.split("-").map(Number); return new Date(
 function corto(nombre){
   let s=String(nombre||"").toUpperCase()
     .replace(/\b(S\.?\s?A\.?|S\.?\s?R\.?\s?L\.?)((\s?[CIFYAG]\.?)*)\s*$/,"")
-    .replace(/\./g,"").replace(/,/g," ")
+    .replace(/\./g," ").replace(/,/g," ").replace(/\s+/g," ").trim()
+    .replace(/\b[A-Z](?: [A-Z]\b)+/g,m=>m.replace(/ /g,""))
     .replace(/\b(INT|INTERNATIONAL|ARGENTINA|ARG|ARGENTINE|COMPANY|CO|LTDA|COOP)\b/g,"").replace(/\s+/g," ").trim();
   if(!s) s=String(nombre||"").trim();
   return s.split(" ").slice(0,2).join(" ");
@@ -662,6 +663,38 @@ function nombresHojas(exps){
   return m;
 }
 
+// Torta de toneladas por grupo, dibujada en un canvas y pegada como imagen en el Excel
+function graficoTorta(t,titulo){
+  const W=560,H=330,esc2=2, cv=document.createElement("canvas"); cv.width=W*esc2; cv.height=H*esc2;
+  const c=cv.getContext("2d"); c.scale(esc2,esc2);
+  c.fillStyle="#ffffff"; c.fillRect(0,0,W,H);
+  c.fillStyle="#1b2622"; c.font="bold 15px Arial, sans-serif"; c.textBaseline="top"; c.fillText(titulo,16,14);
+  const partes=[...GRUPOS.map(g=>({n:g.nombre,kg:t[g.id].kg,col:{g1:"#c79a1e",g2:"#a2561b",g3:"#2e6150"}[g.id]})),{n:"Sin CP",kg:t.sin.kg,col:"#8a9590"}]
+    .filter((p,i)=>p.kg>0||i<3);
+  const tot=partes.reduce((s,p)=>s+p.kg,0);
+  const cx=150, cy=185, r=115;
+  if(!tot){ c.fillStyle="#5c6964"; c.font="13px Arial, sans-serif"; c.fillText("Sin datos todavía",cx-50,cy-6); }
+  else {
+    let ang=-Math.PI/2;
+    for(const p of partes){ if(!p.kg) continue; const a=p.kg/tot*Math.PI*2;
+      c.beginPath(); c.moveTo(cx,cy); c.arc(cx,cy,r,ang,ang+a); c.closePath(); c.fillStyle=p.col; c.fill();
+      c.strokeStyle="#ffffff"; c.lineWidth=2; c.stroke();
+      if(p.kg/tot>=0.05){ const m=ang+a/2; c.fillStyle="#ffffff"; c.font="bold 13px Arial, sans-serif"; c.textAlign="center"; c.textBaseline="middle";
+        c.fillText(fmtPct(p.kg/tot*100),cx+Math.cos(m)*r*0.62,cy+Math.sin(m)*r*0.62); c.textAlign="left"; }
+      ang+=a; }
+  }
+  let y=95;
+  for(const p of partes){
+    c.fillStyle=p.col; c.fillRect(300,y,14,14);
+    c.fillStyle="#1b2622"; c.font="bold 13px Arial, sans-serif"; c.textBaseline="top"; c.fillText(p.n,322,y);
+    c.fillStyle="#5c6964"; c.font="13px Arial, sans-serif";
+    c.fillText(`${fmtKg(p.kg)} tn · ${fmtPct(tot?p.kg/tot*100:0)}`,322,y+18);
+    y+=46;
+  }
+  c.fillStyle="#1b2622"; c.font="bold 13px Arial, sans-serif"; c.fillText(`Total: ${fmtKg(tot)} tn`,300,y+4);
+  return cv.toDataURL("image/png").split(",")[1];
+}
+
 async function construirExcel(){
   const wb=new ExcelJS.Workbook();
   wb.creator="Trigo por proteína"; wb.created=new Date();
@@ -778,6 +811,11 @@ async function construirExcel(){
     ws.getCell("B28").value=exp?"Los números en azul son valores cargados a mano. El resto se calcula con fórmulas a partir de la hoja Camiones."
       :"Se calcula sumando las hojas de cada exportador y la hoja Camiones.";
     ws.getCell("B28").font={...F,size:9,italic:true,color:{argb:XC.gris}};
+
+    // Gráfico de torta del acumulado, a la derecha de los cuadros
+    ws.getColumn(10).width=3;
+    const img=wb.addImage({base64:graficoTorta(a,exp?`Acumulado ${corto(exp)}: toneladas por grupo`:"Acumulado global: toneladas por grupo"),extension:"png"});
+    ws.addImage(img,{tl:{col:10,row:4},ext:{width:448,height:264}});
   }
 
   const ps={orientation:"landscape",fitToPage:true,fitToWidth:1,fitToHeight:0,paperSize:9,margins:{left:.5,right:.5,top:.6,bottom:.6,header:.3,footer:.3}};
