@@ -53,6 +53,8 @@ button.link{border:0;background:none;padding:.2rem .3rem;color:var(--muted);text
 
 /* Silo strip: the memorable element */
 .silo{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:20px 22px 18px;margin-bottom:22px}
+.pie{margin-top:28px;text-align:center;font-size:.85rem}
+.pie .link{color:var(--muted);opacity:.75}
 .tabs{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 14px}
 .tabs:empty{display:none}
 .tabs button{border-radius:999px;padding:.45rem 1rem;font-weight:600}
@@ -141,15 +143,12 @@ td.cpcell{width:7.5rem}
     <div class="actions">
       <button id="btnActualizar">Actualizar</button>
       <button id="btnExport" class="hidden">Descargar Excel</button>
-      <button id="btnMail" class="hidden">Enviar por mail</button>
-      <button id="btnConn">Conexión</button>
       <button id="btnBase">Editar punto de partida</button>
     </div>
   </header>
 
   <p id="status" class="status">Conectando…</p>
   <section class="card hidden" id="conexion" style="margin-bottom:22px"></section>
-  <section class="card hidden" id="mailCard" style="margin-bottom:22px"></section>
   <nav class="tabs" id="tabs" role="tablist" aria-label="Exportador"></nav>
 
   <section class="silo" aria-label="Acumulado total">
@@ -196,6 +195,7 @@ td.cpcell{width:7.5rem}
     <div class="card-head"><h2>Listados cargados</h2></div>
     <div class="scroll" id="hist"></div>
   </section>
+  <footer class="pie"><button id="btnConn" class="link">Configuración de la conexión</button></footer>
 </div>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
@@ -328,7 +328,7 @@ async function actualizar(silencioso){
 }
 function estadoConectado(){
   const h=ultimaLectura?ultimaLectura.toLocaleTimeString("es-AR",{hour:"2-digit",minute:"2-digit",hour12:false}):"";
-  setStatus(`Conectado a la planilla. Actualizado a las ${h}.`+(versionScript&&versionScript<3?" Falta actualizar el script para separar por exportador y mandar mails.":""),versionScript&&versionScript<3);
+  setStatus(`Conectado a la planilla. Actualizado a las ${h}.`+(versionScript&&versionScript<3?" Falta actualizar el script de la planilla para separar por exportador.":""),versionScript&&versionScript<3);
 }
 
 /* ---------- dibujo ---------- */
@@ -383,7 +383,6 @@ function render(){
   renderSinCP();
   const hay=!!conn&&(cargas.length||Object.keys(bases).length);
   $("btnExport").classList.toggle("hidden",!hay);
-  $("btnMail").classList.toggle("hidden",!hay);
   $("btnBase").disabled=!canWrite;
   if(!$("baseCard").classList.contains("hidden")) renderBaseForm();
 }
@@ -819,8 +818,53 @@ async function construirExcel(){
   }
 
   const ps={orientation:"landscape",fitToPage:true,fitToWidth:1,fitToHeight:0,paperSize:9,margins:{left:.5,right:.5,top:.6,bottom:.6,header:.3,footer:.3}};
+  const wsRes=wb.addWorksheet("Resumen",{views:[{showGridLines:false}],properties:{tabColor:{argb:XC.g1}},pageSetup:{...ps,fitToHeight:0}});
   hojaCuadros(wb.addWorksheet("Global",{views:[{showGridLines:false}],properties:{tabColor:{argb:XC.ink}},pageSetup:ps}),null);
   for(const e of exps) hojaCuadros(wb.addWorksheet(hojas[e],{views:[{showGridLines:false}],properties:{tabColor:{argb:XC.verde}},pageSetup:ps}),e);
+
+  /* Resumen: global (acumulado y del día) y el acumulado de cada exportador, con su torta al lado */
+  (function(ws){
+    ws.columns=[{width:2},{width:13},{width:14},{width:15},{width:10},{width:12},{width:9},{width:12},{width:12},{width:3}];
+    ws.mergeCells("B2:I2");
+    ws.getCell("B2").value="Resumen: trigo por proteína"; ws.getCell("B2").font={name:"Arial",size:18,bold:true,color:{argb:XC.ink}}; ws.getRow(2).height=28;
+    ws.mergeCells("B3:I3");
+    ws.getCell("B3").value=`En toneladas. Peso: ${CAMPOS[kgCampo].toLowerCase()}. Emitido el ${emitidoTxt}. El detalle de cada uno está en su hoja.`;
+    ws.getCell("B3").font={...F,color:{argb:XC.gris}};
+    const ALTO=13;   // filas por bloque de exportador (la torta ocupa unas 11)
+    const bloque=(r0,titulo,hoja,filaIni,t,conCam,torta)=>{
+      ws.mergeCells(r0,2,r0,9);
+      const c0=ws.getCell(r0,2); c0.value=titulo; c0.font={name:"Arial",size:13,bold:true,color:{argb:XC.verde}};
+      for(let k=2;k<=9;k++) ws.getCell(r0,k).border={bottom:{style:"medium",color:{argb:XC.verde}}};
+      ws.getRow(r0).height=22;
+      const hdr=["Grupo","Prot. 13,5","Base seca",conCam?"Camiones":"","Toneladas","%","Prom. CP B. 13,5","Prom. CP B. seca"];
+      hdr.forEach((v,i)=>{ const c=ws.getCell(r0+1,i+2); c.value=v; c.font={...F,bold:true,color:{argb:"FFFFFFFF"}}; c.fill=fill(XC.verde); c.alignment={horizontal:i<3?"left":"right",vertical:"middle",wrapText:true}; });
+      ws.getRow(r0+1).height=28;
+      const totKg=sumKg(t);
+      for(let i=0;i<5;i++){
+        const r=r0+2+i, src=filaIni+i, g=GRUPOS[i]||null, esTot=i===4, esSin=i===3;
+        const x=esTot?null:(g?t[g.id]:t.sin);
+        const p=esTot?promTot(t):(g&&x.kg?x.kgcp/x.kg:null);
+        const val=[
+          esTot?"Total":(g?g.nombre:"Sin CP"), g?g.cp:(esSin?"sin análisis":""), g?g.bs:"",
+          conCam?res(esTot?GK.reduce((s,k)=>s+t[k].n,0)+t.sin.n:x.n,`'${hoja}'!E${src}`):"",
+          res(aTn(esTot?totKg:x.kg),`'${hoja}'!F${src}`),
+          res(esTot?(totKg?1:0):(totKg?x.kg/totKg:0),`'${hoja}'!G${src}`),
+          esSin?"–":res(p==null?"":+p.toFixed(4),`IF('${hoja}'!H${src}="","",'${hoja}'!H${src})`),
+          esSin?"–":res(p==null?"":+bSeca(p).toFixed(4),`IF('${hoja}'!I${src}="","",'${hoja}'!I${src})`)];
+        val.forEach((v,k)=>{ const c=ws.getCell(r,k+2); c.value=v; c.alignment={horizontal:k<3?"left":"right",vertical:"middle"};
+          c.font={...F,bold:esTot||k===0,italic:esSin,size:esTot?11:10,color:{argb:(k===1||k===2)?XC.gris:XC.ink}};
+          c.border=esTot?{top:{style:"medium",color:{argb:XC.ink}}}:{bottom:thin(XC.linea)}; });
+        if(!esTot){ const b=ws.getCell(r,2); b.fill=fill(g?XC[g.id+"t"]:XC.sint); b.border={left:{style:"thick",color:{argb:g?XC[g.id]:XC.sin}},bottom:thin(XC.linea)}; }
+        ws.getCell(r,5).numFmt="0"; ws.getCell(r,6).numFmt="#,##0"; ws.getCell(r,7).numFmt="0.0%"; ws.getCell(r,8).numFmt="0.00"; ws.getCell(r,9).numFmt="0.00";
+        ws.getRow(r).height=19;
+      }
+      if(torta){ const img=wb.addImage({base64:graficoTorta(t,torta),extension:"png"}); ws.addImage(img,{tl:{col:10,row:r0-1},ext:{width:390,height:230}}); }
+    };
+    let r=5;
+    bloque(r,"Global: acumulado","Global",7,acumulado("global"),false,"Global: toneladas por grupo"); r+=8;
+    bloque(r,`Global: del día ${dia?fechaCorta(dia):""}`,"Global",15,delDia("global",dia),true,null); r+=9;
+    for(const e of exps){ bloque(r,`${corto(e)}: acumulado`,hojas[e],7,acumulado(e),false,`${corto(e)}: toneladas por grupo`); r+=ALTO; }
+  })(wsRes);
 
   /* Por día (una fila por día y exportador) */
   const wd=wb.addWorksheet("Por día",{views:[{state:"frozen",ySplit:1,showGridLines:false}],properties:{tabColor:{argb:XC.g1}},pageSetup:{...ps,printTitlesRow:"1:1"}});
@@ -890,86 +934,6 @@ async function exportar(){
   setTimeout(()=>URL.revokeObjectURL(u),4000);
 }
 
-/* ---------- mail ---------- */
-function htmlCuadro(t,conCamiones){
-  const th='style="background:#2e6150;color:#fff;padding:6px 8px;font-weight:bold;text-align:right;font-size:12px"';
-  const thL='style="background:#2e6150;color:#fff;padding:6px 8px;font-weight:bold;text-align:left;font-size:12px"';
-  const td='style="padding:5px 8px;border-bottom:1px solid #c9d0cb;text-align:right;font-size:13px"';
-  const tdL=c=>`style="padding:5px 8px;border-bottom:1px solid #c9d0cb;text-align:left;font-size:13px;font-weight:bold;border-left:4px solid ${c}"`;
-  const tot='style="padding:6px 8px;border-top:2px solid #1b2622;text-align:right;font-size:13px;font-weight:bold"';
-  const totL='style="padding:6px 8px;border-top:2px solid #1b2622;text-align:left;font-size:13px;font-weight:bold"';
-  const colores={g1:"#c79a1e",g2:"#a2561b",g3:"#2e6150"};
-  const totKg=sumKg(t), pt=promTot(t);
-  let h=`<table cellspacing="0" cellpadding="0" style="border-collapse:collapse;font-family:Arial,sans-serif;color:#1b2622;margin:4px 0 14px">
-    <tr><th ${thL}>Grupo</th><th ${thL}>Prot. 13,5</th>${conCamiones?`<th ${th}>Camiones</th>`:""}<th ${th}>Toneladas</th><th ${th}>%</th><th ${th}>Prom. CP B. 13,5</th><th ${th}>Prom. CP B. seca</th></tr>`;
-  for(const g of GRUPOS){ const r=t[g.id], p=r.kg?r.kgcp/r.kg:null;
-    h+=`<tr><td ${tdL(colores[g.id])}>${g.nombre}</td><td ${td.replace("right","left")}>${g.cp}</td>${conCamiones?`<td ${td}>${r.n}</td>`:""}<td ${td}>${fmtKg(r.kg)}</td><td ${td}>${fmtPct(totKg?r.kg/totKg*100:0)}</td><td ${td}>${fmtCp(p)}</td><td ${td}>${p==null?"–":fmtCp(bSeca(p))}</td></tr>`; }
-  if(t.sin.n||t.sin.kg) h+=`<tr><td ${tdL("#8a9590")}>Sin CP</td><td ${td.replace("right","left")}>sin análisis</td>${conCamiones?`<td ${td}>${t.sin.n}</td>`:""}<td ${td}>${fmtKg(t.sin.kg)}</td><td ${td}>${fmtPct(totKg?t.sin.kg/totKg*100:0)}</td><td ${td}>–</td><td ${td}>–</td></tr>`;
-  h+=`<tr><td ${totL}>Total</td><td ${tot}></td>${conCamiones?`<td ${tot}>${GK.reduce((s,g)=>s+t[g].n,0)+t.sin.n}</td>`:""}<td ${tot}>${fmtKg(totKg)}</td><td ${tot}>100 %</td><td ${tot}>${fmtCp(pt)}</td><td ${tot}>${pt==null?"–":fmtCp(bSeca(pt))}</td></tr></table>`;
-  return h;
-}
-function htmlMail(vistas,dia){
-  let h=`<div style="font-family:Arial,sans-serif;color:#1b2622;font-size:14px">
-    <p style="margin:0 0 4px">Cuadros de trigo por proteína al ${fechaCorta(dia)}. En toneladas (${campo()==="netopto"?"neto en planta":"neto con mermas"}).</p>`;
-  for(const v of vistas){
-    h+=`<h2 style="font-size:17px;margin:20px 0 6px;color:#2e6150;border-bottom:2px solid #2e6150;padding-bottom:3px">${esc(nombreVista(v))}</h2>
-      <p style="margin:6px 0 0;font-weight:bold">Acumulado</p>${htmlCuadro(acumulado(v),false)}
-      <p style="margin:6px 0 0;font-weight:bold">Del día ${fechaCorta(dia)}</p>${htmlCuadro(delDia(v,dia),true)}`;
-  }
-  return h+`<p style="color:#5c6964;font-size:12px;margin-top:18px">Enviado desde la app Trigo por proteína.</p></div>`;
-}
-function renderMail(){
-  const el=$("mailCard"), exps=exportadores();
-  const dias=[...new Set(cargas.map(c=>c.fecha).filter(Boolean))].sort().reverse();
-  const dia=diaSel&&dias.includes(diaSel)?diaSel:(dias[0]||"");
-  const opciones=["global",...exps];
-  el.innerHTML=`<div class="card-head"><h2>Enviar cuadros por mail</h2></div>
-    <div class="conn-form">
-      <label for="mPara">Para</label><input id="mPara" type="text" autocomplete="email" placeholder="nombre@empresa.com, otro@empresa.com" value="${esc(destinatarios)}">
-      <label for="mAsunto">Asunto</label><input id="mAsunto" type="text" value="Trigo por proteína: cuadros al ${esc(fechaCorta(dia))}">
-      <label for="mDia">Día</label><select id="mDia">${dias.map(d=>`<option value="${esc(d)}"${d===dia?" selected":""}>${fechaCorta(d)}</option>`).join("")||"<option value=''>Sin datos</option>"}</select>
-    </div>
-    <fieldset class="checks"><legend>Cuadros a incluir (acumulado y del día de cada uno)</legend>
-      ${opciones.map(v=>`<label><input type="checkbox" class="mVista" value="${esc(v)}" checked> ${v==="global"?"Global":esc(corto(v))}</label>`).join("")}
-      <label class="sep"><input type="checkbox" id="mAdjunto" checked> Adjuntar el Excel completo</label>
-    </fieldset>
-    <p class="meta" style="margin:8px 0 0">Sale desde la cuenta de Google de la planilla. Los destinatarios quedan guardados para la próxima.</p>
-    <div class="actions" style="margin-top:14px"><button class="primary" id="btnEnviar">Enviar</button><button id="btnCerrarMail">Cancelar</button></div>`;
-  el.classList.remove("hidden");
-  $("mDia").onchange=e=>{ $("mAsunto").value=`Trigo por proteína: cuadros al ${fechaCorta(e.target.value)}`; };
-  $("btnCerrarMail").onclick=()=>el.classList.add("hidden");
-  $("btnEnviar").onclick=enviarMail;
-  el.scrollIntoView({block:"nearest"});
-}
-function aBase64(buf){
-  const b=new Uint8Array(buf); let s="";
-  for(let i=0;i<b.length;i+=0x8000) s+=String.fromCharCode.apply(null,b.subarray(i,i+0x8000));
-  return btoa(s);
-}
-async function enviarMail(){
-  const para=$("mPara").value.split(/[,;\s]+/).filter(Boolean);
-  const malos=para.filter(x=>!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(x));
-  if(!para.length){ toast("Falta a quién mandarlo."); return; }
-  if(malos.length){ toast(`Esta dirección no parece válida: ${malos[0]}`); return; }
-  const vistas=[...document.querySelectorAll(".mVista:checked")].map(x=>x.value);
-  if(!vistas.length){ toast("Elegí al menos un cuadro."); return; }
-  const dia=$("mDia").value;
-  const b=$("btnEnviar"); b.disabled=true; b.textContent="Enviando…";
-  try{
-    const datos={para:para.join(", "),asunto:$("mAsunto").value.trim()||"Trigo por proteína",html:htmlMail(vistas,dia)};
-    if($("mAdjunto").checked){
-      const diaPrev=diaSel; diaSel=dia;
-      try{ datos.adjunto={nombre:nombreExcel(),datos:aBase64(await construirExcel())}; } finally{ diaSel=diaPrev; }
-    }
-    const j=await api("mail",datos);
-    $("mailCard").classList.add("hidden"); render(); estadoConectado();
-    toast(`Mail enviado${typeof j.cuota==="number"?` (quedan ${j.cuota} envíos hoy)`:""}`);
-  }catch(err){
-    b.disabled=false; b.textContent="Enviar";
-    toast(err instanceof ErrorPlanilla?err.message:"No se pudo enviar. Probá de nuevo.");
-  }
-}
-
 /* ---------- botones y eventos ---------- */
 let toastT;
 function toast(m){ const t=$("toast"); t.textContent=m; t.classList.add("on"); clearTimeout(toastT); toastT=setTimeout(()=>t.classList.remove("on"),3200); }
@@ -984,7 +948,6 @@ $("hist").addEventListener("click",e=>{ const b=e.target.closest("[data-del]"); 
 $("tabs").addEventListener("click",e=>{ const b=e.target.closest("[data-v]"); if(!b) return; vista=b.dataset.v; render(); });
 $("btnBase").onclick=()=>{ renderBaseForm(); $("baseCard").classList.remove("hidden"); $("baseCard").scrollIntoView({block:"nearest"}); };
 $("btnExport").onclick=exportar;
-$("btnMail").onclick=()=>{ if(versionScript&&versionScript<3){ toast("Para mandar mails hay que actualizar el script de la planilla (Codigo.gs nuevo)."); return; } renderMail(); };
 function setStatus(msg,warn){ const s=$("status"); s.textContent=msg; s.classList.toggle("w",!!warn); s.classList.toggle("hidden",!msg); }
 
 /* ---------- pantalla de conexión ---------- */
@@ -1000,7 +963,9 @@ function renderConexion(){
       <p class="meta" style="margin:8px 0 0">El link incluye la clave: pasáselo solo a quien tenga que cargar o mirar los datos.</p>
       <div class="actions" style="margin-top:14px"><button id="btnDesconectar">Desconectar esta computadora</button><button id="btnCerrarConn">Cerrar</button></div>`;
     $("btnCopiar").onclick=async()=>{ const i=$("linkOtra"); try{ await navigator.clipboard.writeText(i.value); toast("Link copiado"); }catch{ i.select(); document.execCommand("copy"); toast("Link copiado"); } };
-    $("btnDesconectar").onclick=()=>{ if(!confirm("¿Desconectar esta computadora de la planilla? Los datos no se borran: quedan en la planilla.")) return;
+    $("btnDesconectar").onclick=()=>{
+      const r=prompt("Si desconectás esta computadora, para volver a usar la app hay que pegar de nuevo la dirección y la clave (o abrir el link de conexión).\n\nLos datos no se borran: quedan en la planilla.\n\nPara confirmar, escribí DESCONECTAR:");
+      if(!r||r.trim().toUpperCase()!=="DESCONECTAR") return;
       conn=null; guardarConexion(null); bases={}; cargas=[]; versionScript=0; canWrite=false; render(); renderConexion(); setStatus("Sin conexión con la planilla.",true); };
     $("btnCerrarConn").onclick=()=>el.classList.add("hidden");
   } else {
@@ -1023,7 +988,7 @@ function renderConexion(){
   }
   el.classList.remove("hidden");
 }
-$("btnConn").onclick=()=>{ renderConexion(); $("conexion").scrollIntoView({block:"nearest"}); };
+$("btnConn").onclick=()=>{ renderConexion(); $("conexion").scrollIntoView({block:"start"}); };
 $("btnActualizar").onclick=()=>actualizar(false);
 
 render();
@@ -1038,7 +1003,7 @@ render();
   conn=leerConexion();
   if(!conn){ setStatus("Esta computadora todavía no está conectada a la planilla.",true); renderConexion(); return; }
   actualizar(false);
-  const libre=()=>document.visibilityState==="visible"&&!pendiente&&!Object.keys(editsCP).length&&$("mailCard").classList.contains("hidden");
+  const libre=()=>document.visibilityState==="visible"&&!pendiente&&!Object.keys(editsCP).length;
   setInterval(()=>{ if(libre()) actualizar(true); },60000);
   document.addEventListener("visibilitychange",()=>{ if(libre()) actualizar(true); });
 })();
