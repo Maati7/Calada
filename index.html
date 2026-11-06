@@ -663,34 +663,38 @@ function nombresHojas(exps){
 }
 
 // Torta de toneladas por grupo, dibujada en un canvas y pegada como imagen en el Excel
-function graficoTorta(t,titulo){
-  const W=560,H=330,esc2=2, cv=document.createElement("canvas"); cv.width=W*esc2; cv.height=H*esc2;
+const LOGO_JPG="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";
+
+// Torta de toneladas por grupo, dibujada en un canvas y pegada como imagen en el Excel
+function graficoTorta(t,titulo,W=560,H=330){
+  const esc2=2, cv=document.createElement("canvas"); cv.width=W*esc2; cv.height=H*esc2;
   const c=cv.getContext("2d"); c.scale(esc2,esc2);
   c.fillStyle="#ffffff"; c.fillRect(0,0,W,H);
-  c.fillStyle="#1b2622"; c.font="bold 15px Arial, sans-serif"; c.textBaseline="top"; c.fillText(titulo,16,14);
+  c.fillStyle="#1b2622"; c.font="bold 15px Arial, sans-serif"; c.textBaseline="top"; c.fillText(titulo,14,12);
   const partes=[...GRUPOS.map(g=>({n:g.nombre,kg:t[g.id].kg,col:{g1:"#c79a1e",g2:"#a2561b",g3:"#2e6150"}[g.id]})),{n:"Sin CP",kg:t.sin.kg,col:"#8a9590"}]
     .filter((p,i)=>p.kg>0||i<3);
   const tot=partes.reduce((s,p)=>s+p.kg,0);
-  const cx=150, cy=185, r=115;
-  if(!tot){ c.fillStyle="#5c6964"; c.font="13px Arial, sans-serif"; c.fillText("Sin datos todavía",cx-50,cy-6); }
+  const r=Math.min((H-52)/2,W*0.22), cx=18+r, cy=40+(H-40)/2-4, lx=cx+r+28;
+  if(!tot){ c.fillStyle="#5c6964"; c.font="14px Arial, sans-serif"; c.fillText("Sin datos todavía",cx-55,cy-7); }
   else {
     let ang=-Math.PI/2;
     for(const p of partes){ if(!p.kg) continue; const a=p.kg/tot*Math.PI*2;
       c.beginPath(); c.moveTo(cx,cy); c.arc(cx,cy,r,ang,ang+a); c.closePath(); c.fillStyle=p.col; c.fill();
       c.strokeStyle="#ffffff"; c.lineWidth=2; c.stroke();
-      if(p.kg/tot>=0.05){ const m=ang+a/2; c.fillStyle="#ffffff"; c.font="bold 13px Arial, sans-serif"; c.textAlign="center"; c.textBaseline="middle";
+      if(p.kg/tot>=0.05){ const m=ang+a/2; c.fillStyle="#ffffff"; c.font="bold 14px Arial, sans-serif"; c.textAlign="center"; c.textBaseline="middle";
         c.fillText(fmtPct(p.kg/tot*100),cx+Math.cos(m)*r*0.62,cy+Math.sin(m)*r*0.62); c.textAlign="left"; }
       ang+=a; }
   }
-  let y=95;
+  const paso=Math.min(44,(H-70)/(partes.length+1));
+  let y=cy-(paso*(partes.length+0.6))/2;
   for(const p of partes){
-    c.fillStyle=p.col; c.fillRect(300,y,14,14);
-    c.fillStyle="#1b2622"; c.font="bold 13px Arial, sans-serif"; c.textBaseline="top"; c.fillText(p.n,322,y);
+    c.fillStyle=p.col; c.fillRect(lx,y+1,14,14);
+    c.fillStyle="#1b2622"; c.font="bold 14px Arial, sans-serif"; c.textBaseline="top"; c.fillText(p.n,lx+22,y);
     c.fillStyle="#5c6964"; c.font="13px Arial, sans-serif";
-    c.fillText(`${fmtKg(p.kg)} tn · ${fmtPct(tot?p.kg/tot*100:0)}`,322,y+18);
-    y+=46;
+    c.fillText(`${fmtKg(p.kg)} tn · ${fmtPct(tot?p.kg/tot*100:0)}`,lx+22,y+18);
+    y+=paso;
   }
-  c.fillStyle="#1b2622"; c.font="bold 13px Arial, sans-serif"; c.fillText(`Total: ${fmtKg(tot)} tn`,300,y+4);
+  c.fillStyle="#1b2622"; c.font="bold 14px Arial, sans-serif"; c.fillText(`Total: ${fmtKg(tot)} tn`,lx,y+4);
   return cv.toDataURL("image/png").split(",")[1];
 }
 
@@ -818,52 +822,96 @@ async function construirExcel(){
   }
 
   const ps={orientation:"landscape",fitToPage:true,fitToWidth:1,fitToHeight:0,paperSize:9,margins:{left:.5,right:.5,top:.6,bottom:.6,header:.3,footer:.3}};
-  const wsRes=wb.addWorksheet("Resumen",{views:[{showGridLines:false}],properties:{tabColor:{argb:XC.g1}},pageSetup:{...ps,fitToHeight:0}});
+  const wsRes=wb.addWorksheet("Resumen",{views:[{showGridLines:false}],properties:{tabColor:{argb:XC.g1}},
+    pageSetup:{orientation:"portrait",paperSize:9,fitToPage:true,fitToWidth:1,fitToHeight:0,horizontalCentered:true,
+      margins:{left:.24,right:.24,top:.35,bottom:.35,header:.3,footer:.3}}});
   hojaCuadros(wb.addWorksheet("Global",{views:[{showGridLines:false}],properties:{tabColor:{argb:XC.ink}},pageSetup:ps}),null);
   for(const e of exps) hojaCuadros(wb.addWorksheet(hojas[e],{views:[{showGridLines:false}],properties:{tabColor:{argb:XC.verde}},pageSetup:ps}),e);
 
-  /* Resumen: global (acumulado y del día) y el acumulado de cada exportador, con su torta al lado */
+  /* Resumen: global (acumulado y del día) y el acumulado de cada exportador, con su torta al lado. Pensado para imprimir en A4 vertical. */
   (function(ws){
-    ws.columns=[{width:2},{width:13},{width:14},{width:15},{width:10},{width:12},{width:9},{width:12},{width:12},{width:3}];
-    ws.mergeCells("B2:I2");
-    ws.getCell("B2").value="Resumen: trigo por proteína"; ws.getCell("B2").font={name:"Arial",size:18,bold:true,color:{argb:XC.ink}}; ws.getRow(2).height=28;
-    ws.mergeCells("B3:I3");
-    ws.getCell("B3").value=`En toneladas. Peso: ${CAMPOS[kgCampo].toLowerCase()}. Emitido el ${emitidoTxt}. El detalle de cada uno está en su hoja.`;
-    ws.getCell("B3").font={...F,color:{argb:XC.gris}};
-    const ALTO=13;   // filas por bloque de exportador (la torta ocupa unas 11)
-    const bloque=(r0,titulo,hoja,filaIni,t,conCam,torta)=>{
-      ws.mergeCells(r0,2,r0,9);
-      const c0=ws.getCell(r0,2); c0.value=titulo; c0.font={name:"Arial",size:13,bold:true,color:{argb:XC.verde}};
-      for(let k=2;k<=9;k++) ws.getCell(r0,k).border={bottom:{style:"medium",color:{argb:XC.verde}}};
-      ws.getRow(r0).height=22;
+    const FR={name:"Arial",size:12};
+    const CELESTE="FFDBEEF3", OLIVA="FFEBF1DE";
+    ws.columns=[{width:2},{width:12},{width:15},{width:15},{width:11},{width:13},{width:9},{width:11},{width:11},
+      {width:3},{width:1.5},{width:9},{width:9},{width:9},{width:9},{width:9},{width:9},{width:1.5}];
+    const FIN=18;   // última columna usada (R)
+    const ult=[...new Set(cargas.map(c=>c.fecha).filter(Boolean))].sort().pop()||"";
+    const banda=(r,desde,hasta,color)=>{ for(let k=desde;k<=hasta;k++) ws.getCell(r,k).fill=fill(color); };
+
+    // Encabezado con logo
+    ws.getRow(1).height=6;
+    ws.getRow(2).height=52; banda(2,2,FIN,CELESTE);
+    const t=ws.getCell("B2"); t.value="Resumen: trigo por proteína"; t.font={name:"Arial",size:20,bold:true,color:{argb:XC.ink}}; t.alignment={vertical:"bottom"};
+    ws.addImage(wb.addImage({base64:LOGO_JPG,extension:"jpeg"}),{tl:{col:13.3,row:1.12},ext:{width:202,height:60}});
+    ws.mergeCells("B3:Q3");
+    const s=ws.getCell("B3"); s.value=`En toneladas. Peso: ${CAMPOS[kgCampo].toLowerCase()}. Emitido el ${emitidoTxt}.`;
+    s.font={...FR,size:11,color:{argb:XC.gris}}; s.alignment={vertical:"middle"}; ws.getRow(3).height=26;
+    ws.getRow(4).height=8;
+
+    const filasAlto=[]; filasAlto[1]=6; filasAlto[2]=52; filasAlto[3]=26; filasAlto[4]=8;
+    const alto=(r,h)=>{ ws.getRow(r).height=h; filasAlto[r]=h; };
+
+    // Un bloque: franja de título, tabla y fila de total; con torta enmarcada a la derecha si corresponde
+    const bloque=(r0,titulo,italica,hoja,filaIni,tt,conCam,torta)=>{
+      alto(r0,26); banda(r0,2,9,OLIVA);
+      const c0=ws.getCell(r0,2); c0.value=titulo; c0.font={...FR,size:13,bold:true,italic:italica,color:{argb:XC.verde}}; c0.alignment={vertical:"middle"};
       const hdr=["Grupo","Prot. 13,5","Base seca",conCam?"Camiones":"","Toneladas","%","Prom. CP B. 13,5","Prom. CP B. seca"];
-      hdr.forEach((v,i)=>{ const c=ws.getCell(r0+1,i+2); c.value=v; c.font={...F,bold:true,color:{argb:"FFFFFFFF"}}; c.fill=fill(XC.verde); c.alignment={horizontal:i<3?"left":"right",vertical:"middle",wrapText:true}; });
-      ws.getRow(r0+1).height=28;
-      const totKg=sumKg(t);
+      alto(r0+1,32);
+      hdr.forEach((v,i)=>{ const c=ws.getCell(r0+1,i+2); c.value=v; c.font={...FR,bold:true,color:{argb:"FFFFFFFF"}}; c.fill=fill(XC.verde); c.alignment={horizontal:"center",vertical:"middle",wrapText:true}; });
+      const totKg=sumKg(tt);
       for(let i=0;i<5;i++){
         const r=r0+2+i, src=filaIni+i, g=GRUPOS[i]||null, esTot=i===4, esSin=i===3;
-        const x=esTot?null:(g?t[g.id]:t.sin);
-        const p=esTot?promTot(t):(g&&x.kg?x.kgcp/x.kg:null);
+        const x=esTot?null:(g?tt[g.id]:tt.sin);
+        const p=esTot?promTot(tt):(g&&x.kg?x.kgcp/x.kg:null);
         const val=[
           esTot?"Total":(g?g.nombre:"Sin CP"), g?g.cp:(esSin?"sin análisis":""), g?g.bs:"",
-          conCam?res(esTot?GK.reduce((s,k)=>s+t[k].n,0)+t.sin.n:x.n,`'${hoja}'!E${src}`):"",
+          conCam?res(esTot?GK.reduce((s,k)=>s+tt[k].n,0)+tt.sin.n:x.n,`'${hoja}'!E${src}`):"",
           res(aTn(esTot?totKg:x.kg),`'${hoja}'!F${src}`),
           res(esTot?(totKg?1:0):(totKg?x.kg/totKg:0),`'${hoja}'!G${src}`),
           esSin?"–":res(p==null?"":+p.toFixed(4),`IF('${hoja}'!H${src}="","",'${hoja}'!H${src})`),
           esSin?"–":res(p==null?"":+bSeca(p).toFixed(4),`IF('${hoja}'!I${src}="","",'${hoja}'!I${src})`)];
+        alto(r,esTot?23:21);
         val.forEach((v,k)=>{ const c=ws.getCell(r,k+2); c.value=v; c.alignment={horizontal:k<3?"left":"right",vertical:"middle"};
-          c.font={...F,bold:esTot||k===0,italic:esSin,size:esTot?11:10,color:{argb:(k===1||k===2)?XC.gris:XC.ink}};
-          c.border=esTot?{top:{style:"medium",color:{argb:XC.ink}}}:{bottom:thin(XC.linea)}; });
+          c.font={...FR,bold:esTot||k===0,italic:esSin,color:{argb:(k===1||k===2)&&!esTot?XC.gris:XC.ink}};
+          if(esTot){ c.fill=fill(OLIVA); c.border={top:{style:"medium",color:{argb:XC.ink}},bottom:{style:"medium",color:{argb:XC.ink}},
+            left:k===0?{style:"medium",color:{argb:XC.ink}}:undefined,right:k===7?{style:"medium",color:{argb:XC.ink}}:undefined}; }
+          else c.border={bottom:thin(XC.linea)}; });
         if(!esTot){ const b=ws.getCell(r,2); b.fill=fill(g?XC[g.id+"t"]:XC.sint); b.border={left:{style:"thick",color:{argb:g?XC[g.id]:XC.sin}},bottom:thin(XC.linea)}; }
         ws.getCell(r,5).numFmt="0"; ws.getCell(r,6).numFmt="#,##0"; ws.getCell(r,7).numFmt="0.0%"; ws.getCell(r,8).numFmt="0.00"; ws.getCell(r,9).numFmt="0.00";
-        ws.getRow(r).height=19;
       }
-      if(torta){ const img=wb.addImage({base64:graficoTorta(t,torta),extension:"png"}); ws.addImage(img,{tl:{col:10,row:r0-1},ext:{width:390,height:230}}); }
+      if(torta){
+        for(let r=r0;r<=r0+6;r++) banda(r,11,FIN,OLIVA);
+        const hPx=Math.round((26+32+21*4+23)*4/3)-14;   // alto del bloque en píxeles, con un margen
+        const wPx=Math.round(hPx*1.72);
+        ws.addImage(wb.addImage({base64:graficoTorta(tt,torta,430,250),extension:"png"}),{tl:{col:11.15,row:r0-1+0.25},ext:{width:wPx,height:hPx}});
+      }
+      return r0+7;
     };
+    const divisor=r=>{ alto(r,10); alto(r+1,3); banda(r+1,2,FIN,XC.verde); alto(r+2,10); return r+3; };
+
     let r=5;
-    bloque(r,"Global: acumulado","Global",7,acumulado("global"),false,"Global: toneladas por grupo"); r+=8;
-    bloque(r,`Global: del día ${dia?fechaCorta(dia):""}`,"Global",15,delDia("global",dia),true,null); r+=9;
-    for(const e of exps){ bloque(r,`${corto(e)}: acumulado`,hojas[e],7,acumulado(e),false,`${corto(e)}: toneladas por grupo`); r+=ALTO; }
+    r=bloque(r,`Global: acumulado al ${ult?fechaCorta(ult):"–"}`,true,"Global",7,acumulado("global"),false,"Global: toneladas por grupo");
+    alto(r,10); r++;
+    r=bloque(r,`Global: del día ${dia?fechaCorta(dia):"–"}`,true,"Global",15,delDia("global",dia),true,`Global del día ${dia?fechaCorta(dia):""}: toneladas por grupo`);
+    const inicios=[];
+    for(const e of exps){
+      r=divisor(r);
+      inicios.push(r);
+      r=bloque(r,`${corto(e)}: acumulado`,false,hojas[e],7,acumulado(e),false,`${corto(e)}: toneladas por grupo`);
+    }
+    // Saltos de página para que ningún bloque quede cortado al imprimir en A4 vertical
+    const anchoPx=ws.columns.reduce((s,c)=>s+(c.width||9)*7+5,0);
+    const escala=Math.min(1,(8.27-0.48)*96/anchoPx);
+    const altoPagPt=(11.69-0.7-0.3)*72/escala*0.97;
+    let usado=0, fila=1;
+    const hasta=n=>{ let s=0; for(;fila<n;fila++) s+=filasAlto[fila]||15; return s; };
+    usado=hasta(inicios[0]||r);
+    for(let k=0;k<inicios.length;k++){
+      const fin=k+1<inicios.length?inicios[k+1]:r;
+      let h=0; for(let q=inicios[k];q<fin;q++) h+=filasAlto[q]||15;
+      if(usado+h>altoPagPt){ ws.getRow(inicios[k]-1).addPageBreak(); usado=0; }
+      usado+=h; fila=fin;
+    }
   })(wsRes);
 
   /* Por día (una fila por día y exportador) */
